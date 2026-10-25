@@ -1,0 +1,58 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "matches": {
+      "$matchId": {
+        ".read": "auth != null && root.child('matches/' + $matchId + '/players/' + auth.uid).exists()",
+        ".write": false
+      }
+    },
+
+    "hands": {
+      "$matchId": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    },
+
+    "secret": {
+      ".read": false,
+      ".write": false
+    },
+
+    "openRooms": {
+      ".read": "auth != null",
+      ".write": false,
+      ".indexOn": ["createdAt", "ruleSet"]
+    },
+
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null && (data.child('type').val() === 'PUBLIC' || data.child('members/' + auth.uid).exists())",
+        ".write": false
+      }
+    },
+
+    "roomCodes": {
+      ".read": false,
+      ".write": false
+    },
+
+    "queue": {
+      ".read": false,
+      ".write": false
+    },
+
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['online', 'lastSeen'])"
+      }
+    }
+  }
+}

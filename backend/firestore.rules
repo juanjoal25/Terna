@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Función auxiliar para verificar autenticación
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Perfil de usuario y estadísticas
+    match /users/{userId} {
+      // Cualquier usuario autenticado puede leer perfiles (para ver nombres/avatares en sala)
+      allow read: if isAuthenticated();
+
+      // Creación inicial del perfil en el primer login
+      allow create: if isOwner(userId)
+                    && request.resource.data.keys().hasAll(['displayName', 'avatar', 'isAnonymous', 'createdAt'])
+                    && request.resource.data.level == 1
+                    && request.resource.data.xp == 0
+                    && request.resource.data.coins == 0;
+
+      // Solo el usuario puede actualizar sus datos COSMÉTICOS (nombre, avatar)
+      // NUNCA puede modificarse directamente nivel, xp, monedas ni estadísticas desde el cliente.
+      allow update: if isOwner(userId)
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'xp', 'coins', 'stats', 'createdAt']);
+
+      // Borrado de cuenta por el propio usuario (exigencia Google Play)
+      allow delete: if isOwner(userId);
+
+      // Historial de partidas del usuario (subcolección)
+      match /matchHistory/{matchId} {
+        // Solo el dueño puede leer su historial de partidas
+        allow read: if isOwner(userId);
+        // Ningún cliente puede escribir o alterar el historial; solo Cloud Functions (Admin SDK)
+        allow write: if false;
+      }
+    }
+
+    // Historial global / archivo de partidas
+    match /matchHistory/{matchId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.players;
+      allow write: if false;
+    }
+
+    // Tablas de clasificación / Ranking por temporada
+    match /leaderboards/{season}/entries/{userId} {
+      allow read: if isAuthenticated();
+      // Solo el servidor calcula y actualiza puntajes en leaderboards
+      allow write: if false;
+    }
+  }
+}
