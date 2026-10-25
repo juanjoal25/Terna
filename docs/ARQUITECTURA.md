@@ -26,8 +26,22 @@
   - la carta **más baja** o la **más alta** de la mano de cualquier jugador (incluida la propia), o
   - **cualquier carta boca abajo** del centro.
 - Si la carta revelada coincide con las anteriores del turno, el jugador sigue. Si no coincide, **todas las cartas reveladas vuelven a su sitio** (a la mano o boca abajo en su mismo hueco del centro) y el turno pasa al siguiente.
-- Al revelar **tres cartas iguales** se forma un **trío**: se coloca boca arriba frente al jugador y el turno termina *(parámetro `continuarTrasTrio` en el motor, por si se quiere variar)*.
+- Al revelar **tres cartas iguales** se forma una **terna**: se coloca boca arriba frente al jugador y el turno termina (opción `continueAfterSet`).
 - Pedir "la más baja" dos veces a la misma mano revela la **siguiente** más baja aún oculta.
+- **Regla propia de TERNA!: deducir ("Pedir carta").** En lugar de revelar a ciegas, el jugador puede afirmar "Hugo, tienes un 5". Si ese número es ahora mismo la carta menor **o** la mayor de Hugo (entre sus cartas aún ocultas), Hugo la entrega y cuenta como revelada. Si no, Hugo responde con **"-1000 de aura"** y el turno se pierde. Si ya hay cartas reveladas en el turno, solo se puede deducir ese mismo número. Ventaja frente a revelar: comprueba los dos extremos a la vez y, si falla, no muestra ninguna carta.
+
+### 1.1.1 Reglas configurables (implementadas en `backend/functions/src/engine`)
+
+| Opción (`TurnOptions`) | TERNA (por defecto) | Trio original | Qué hace |
+|---|---|---|---|
+| `allowSelfReveal` | sí | sí | Revelar tu propia carta menor o mayor en cualquier momento del turno. Si se apaga, solo se permite cuando no queda otra carta oculta. |
+| `allowClaim` | **sí** | no | Deducir ("Pedir carta"). |
+| `claimRequiresEnd` | no | — | Obliga a decir también "tu menor" o "tu mayor". |
+| `claimFailEndsTurn` | sí | — | Deducir mal hace perder el turno (si no, solo sale "-1000 de aura"). |
+| `allowPass` / `minRevealsBeforePass` | no / 1 | no | "Pasar turno". Apagado por defecto porque permite espiar cartas sin riesgo. |
+| `continueAfterSet` | no | no | Seguir jugando tras formar una terna. |
+
+Modos predefinidos: `TERNA_CLASSIC`, `TERNA_SPICY` y `TRIO_ORIGINAL`. La sala aplica cambios encima con `withOptions(modo, {...})`.
 
 ### 1.2 Condiciones de victoria
 
@@ -45,31 +59,83 @@ Lo único que hace interesante a Trio es **recordar** qué se reveló. Por eso:
 - El tablero **no** muestra historial de cartas reveladas en modo normal.
 - Se puede ofrecer un **modo "Aprendiz"** (solo en partidas privadas o contra bots) que sí muestra pistas.
 
-### 1.4 Flujo de la app
+### 1.4 Flujo de la app (según el diseño de Figma, `diseño/diseño app/`)
 
 ```
-Splash ─► Login invitado automático ─► HOME
-                                        ├─ JUGAR (partida rápida pública)
-                                        │    └─ elegir modo (Clásico / Picante) y nº de jugadores
-                                        │         └─ Pantalla "Buscando jugadores…" (20 s máx.)
-                                        │              └─ se llenan los puestos vacíos con bots ─► TABLERO
-                                        ├─ CREAR SALA (privada)
-                                        │    └─ código de 6 caracteres + enlace para compartir
-                                        │         └─ Lobby: puestos, config del anfitrión, "Iniciar" ─► TABLERO
-                                        ├─ UNIRSE CON CÓDIGO ─► Lobby ─► TABLERO
-                                        ├─ Cómo jugar (tutorial interactivo)
-                                        └─ Perfil / Ajustes
-TABLERO ─► Fin de partida (ImagenGanar7 si fue con los 7) ─► Revancha │ Volver al Home
+SPLASH ("Cargando… Preparando baraja andina")
+  └─► LOGIN ── Google │ Facebook │ Jugar como invitado
+        └─► HOME (menú principal: avatar, nombre, nivel, Ajustes, Créditos)
+              ├─ CREAR SALA ── nº jugadores (3–6) + Privada/Pública ──► SALA DE ESPERA (anfitrión)
+              ├─ UNIRSE A SALA ┬─ código ──────────────────────────────► SALA DE ESPERA (invitado)
+              │                └─ lista "Salas disponibles" (públicas) ─► SALA DE ESPERA (invitado)
+              └─ PARTIDA RÁPIDA ── modal "Buscando oponentes (1/4)" ─────► MESA
+SALA DE ESPERA ── anfitrión pulsa "¡Iniciar partida!" ─► modal "¡Iniciando partida!" ─► MESA
+MESA ─► Fin de partida ─► Revancha │ Home          (pantalla de fin: aún no diseñada)
 ```
 
-### 1.5 Pantalla de tablero
+Hay **tres formas de entrar a una partida**, y el backend debe soportarlas todas:
 
-- **Abajo:** tu mano, ordenada y abanicada (usa la orientación horizontal; todo el arte está en 16:9).
-- **Alrededor:** avatares de los rivales con su nº de cartas, tríos conseguidos y estado de conexión. Al tocar un rival aparecen dos botones: **"Más baja" / "Más alta"**.
-- **Centro:** cuadrícula de cartas boca abajo (reverso `CartaReverso`).
-- **Zona de revelado:** las cartas del turno actual, a la vista de todos.
-- **Barra de turno:** de quién es el turno y un temporizador circular (por defecto 20 s).
-- **Extras:** emotes rápidos (no chat libre en públicas), sonido y vibración al formar trío, confeti con la victoria.
+| Vía | Quién la crea | Cómo se entra | Arranque |
+|---|---|---|---|
+| Sala **privada** | Un jugador (anfitrión) | Solo con código / enlace | El anfitrión pulsa Iniciar (mín. 3) |
+| Sala **pública** | Un jugador (anfitrión) | Aparece en "Salas disponibles" | El anfitrión pulsa Iniciar (mín. 3) |
+| **Partida rápida** | El servidor | Emparejamiento automático | Se llena o vence la espera → bots |
+
+### 1.4.1 Inventario de pantallas
+
+| # | Pantalla (archivo) | Ruta en la app | Estados / variantes |
+|---|---|---|---|
+| 1 | Loading splash | `splash` | progreso real (auth + config + assets) |
+| 2 | Landscape login | `login` | cargando, error de red |
+| 3 | Lobby.png → **Home** | `home` | invitado / con cuenta |
+| 4 | Buscando Partida Rápida (modal) | `home/quickplay` | buscando n/N, cancelando, error |
+| 5 | Crear sala | `room/create` | — |
+| 6 | Unirse a sala | `room/join` | lista vacía, cargando |
+| 7 | Ingresar código (modal) | `room/join/code` | código inválido, sala llena, ya empezó |
+| 8–11 | Sala de espera ×4 | `room/{id}` | privada/pública × anfitrión/invitado |
+| 12 | Iniciando partida (modal) | sobre `room/{id}` | — |
+| 13 | Mesa de juego (+ ~28 frames de flujo de turno) | `game/{id}` | ver §1.5 |
+| 14 | Victoria normal (modal) | sobre `game/{id}` | "Volver a la sala" / "Ir al lobby" |
+| 15 | Jackpot 777 + Victoria épica (modal) | sobre `game/{id}` | — |
+| 16 | Perfil / Perfil invitado | `profile` | foto de Google + lápiz para editar / mascota para invitado |
+| 17 | Ajustes / Ajustes invitado | `settings` | música, efectos, cerrar sesión |
+| 18 | Créditos / Créditos invitado | `credits` | — |
+
+En código, la pantalla `Lobby.png` / `Main menu / Lobby` se llama **Home**, porque el diseño usa "Lobby" también para la sala de espera.
+
+Fuente: archivo de Figma "Terna" (páginas *Wireframes* y *Diseño de la app*); los frames de flujo se numeran `1.x` (empieza preguntando) y `2.x` (empieza por el centro).
+
+### 1.5 Pantalla de tablero (según los flujos de Figma)
+
+**Distribución (3 jugadores):** rivales arriba con su nombre, nº de cartas y mano boca abajo; centro de 3×3 sobre el logo tallado en la mesa; tu mano abanicada abajo; panel de acciones abajo a la derecha; tus ternas apiladas abajo a la izquierda con la insignia "N Ternas completadas"; las ternas de cada rival se apilan junto a su mano. Los huecos del centro se conservan cuando se retira una carta.
+
+**Panel de acciones según el estado:**
+
+| Estado | Panel | Qué pasa |
+|---|---|---|
+| Inicio de mi turno | "ES TU TURNO": **Revelar centro** / **Preguntar** | — |
+| Preguntar | Modal "¿A quién deseas preguntar?" → modal "Carta mayor / Carta menor" | La carta aparece junto a la mano del rival |
+| Revelar centro | Aviso "Selecciona una carta del centro"; el centro se resalta | La carta se voltea en su sitio |
+| Carta revelada | **Tomar carta** / **Pasar turno** | "Tomar" la lleva a tu zona de revelado, junto a tu mano |
+| 1+ cartas en zona | **Agarrar carta del centro** / **Pedir carta** | Sigue el turno |
+| 2 iguales + la 3.ª en mi mano | **¡Hacer terna!** | Se forma la terna con tu propia carta |
+| Acierto | Aviso verde "¡Éxito! Viana sí tiene esa carta." | — |
+| Fallo | Aviso rojo "¡Error! … Pierdes tu turno."; el panel pasa a "Turno perdido" | Las cartas vuelven a su sitio |
+| Turno ajeno | Panel gris "Turno de Hugo"; el rival se resalta con la etiqueta "Pensando…" | — |
+| Trío de 7 | Banner "JACKPOT AUTOMÁTICO 777 · ¡Terna de la suerte!" → modal "¡Victoria épica!" | Victoria instantánea |
+| 3 ternas | Modal "¡Victoria! Has completado 3 Ternas y dominado la mesa" | — |
+
+**Diferencias con las reglas de Trio** (ya resueltas: "Pedir carta" es la regla de deducir de §1.1, y lo demás quedó configurable en §1.1.1):
+
+1. **"Pasar turno"** → opción `allowPass`, apagada por defecto: si se puede pasar tras una carta, cada turno permite **espiar una carta sin riesgo**.
+2. **"Tomar carta" como paso extra** (solo UI). Añade un toque por cada carta revelada. Recomendación: la carta va sola a la zona de revelado al terminar la animación de volteo.
+3. **Revelar tu propia carta** → `allowSelfReveal`, encendida por defecto. "¡Hacer terna!" es el caso de la tercera carta (lo calcula `availableActions().completeWithOwn`), pero conviene permitirlo también como primera o segunda carta: añadir "Yo" al modal o dejar tocar los extremos de tu mano.
+4. **Mensajes del fallo:**
+   - Al **revelar** y no coincidir, todos deben ver la carta (~1,5 s) antes de que vuelva. La memoria es la mecánica. Texto sugerido: "La carta menor de Hugo es un 12. ¡No coincide!".
+   - Al **deducir** mal ("Pedir carta"), no se muestra ninguna carta y sale el mensaje **"-1000 de aura"** (evento `CLAIM_FAILED`).
+5. **Los demás deben ver cada revelación del turno ajeno**, no solo "Pensando…".
+
+**Falta en el diseño:** temporizador de turno, distribuciones para 4–6 jugadores (centros de 8 o 6 cartas), botón para salir o abandonar la partida, indicador de rival desconectado o reemplazado por bot, y emotes (opcional).
 
 ### 1.6 Más allá del MVP
 
@@ -129,7 +195,7 @@ Todo lo demás de la arquitectura se desprende de aquí.
 
 | Servicio | Uso |
 |---|---|
-| **Authentication** | Invitado = **Anonymous Auth**. Después, `linkWithCredential` con Google (Credential Manager) para conservar el mismo UID y el progreso. |
+| **Authentication** | Tres botones en el login: **Google** (Credential Manager), **Facebook** (Facebook Login SDK; requiere app en Meta for Developers) e **invitado** (Anonymous Auth). Un invitado puede vincular su cuenta después con `linkWithCredential` y conserva su UID y su progreso. |
 | **Realtime Database (RTDB)** | **Estado en vivo** de partidas, salas, cola de búsqueda y **presencia** (`onDisconnect`). |
 | **Cloud Firestore** | Datos **persistentes**: perfiles, estadísticas, historial de partidas, ranking. |
 | **Cloud Functions (2ª gen, TypeScript, Node 22)** | Toda la lógica de juego: motor de reglas, matchmaking, bots, temporizadores. |
@@ -199,7 +265,7 @@ Latencia típica total con la función "caliente": **~200–400 ms**. Para que s
 - **Feedback optimista:** al tocar, la carta objetivo se levanta y brilla *antes* de la respuesta; el volteo ocurre cuando llega el valor.
 - **`minInstances: 1`** en la función `gameAction` para evitar *cold starts* (cuesta unos pocos dólares al mes).
 - **Una sola función** `gameAction` para todas las acciones de partida (con `concurrency` alta) en vez de una función por acción: una sola instancia caliente lo atiende todo.
-- **Misma región** para RTDB, Firestore y Functions. Desde Colombia, `us-east1` suele dar la menor latencia; **mídelo antes de crear el proyecto, porque la región de Firestore no se puede cambiar después**.
+- **Misma región** para RTDB, Firestore y Functions: **`us-central1`**. Realtime Database solo se aloja en unas pocas ubicaciones, y en América es `us-central1`, así que el resto va allí también. Las regiones de RTDB y Firestore no se pueden cambiar después (ver [FIREBASE_SETUP.md](FIREBASE_SETUP.md) §3).
 
 ### 4.2 Eventos + estado (clave de la fluidez)
 
@@ -218,19 +284,27 @@ El cliente **no** salta de un estado a otro: reproduce los eventos en orden en u
 
 ### 5.1 Realtime Database (partidas en vivo)
 
+**Sala ≠ partida.** El modal de victoria ofrece "Volver a la sala", así que la sala (anfitrión, jugadores, código) **sobrevive** a cada partida y permite jugar la revancha con el mismo grupo. Por eso hay dos entidades: `rooms` (persiste mientras haya gente) y `matches` (una por partida jugada). Las partidas rápidas crean una sala técnica sin anfitrión.
+
 ```jsonc
 {
+  "rooms": {
+    "{roomId}": {
+      "name": "Sala de Miguel", "type": "PUBLIC | PRIVATE | QUICKPLAY",
+      "hostUid": "uid", "code": "TRN-7K4Q", "maxPlayers": 6,
+      "config": { "ruleSet": "TRIO_CLASSIC", "turnSeconds": 20, "fillWithBots": true },
+      "status": "WAITING | IN_MATCH",
+      "currentMatchId": null,
+      "members": { "{uid}": { "name": "Felipe", "avatar": "jaguar_01", "joinedAt": 0 } }
+    }
+  },
   "matches": {
     "{matchId}": {
       "meta": {
-        "type": "PUBLIC | PRIVATE",
-        "mode": "CLASSIC | SPICY",
+        "roomId": "{roomId}",
         "ruleSet": "TRIO_CLASSIC",  // cuántas copias, tamaño del set, reparto, victoria
         "ruleVersion": 1,
-        "status": "WAITING | PLAYING | FINISHED",
-        "maxPlayers": 4,
-        "hostUid": "uid",
-        "code": "K7M2QX",          // solo privadas
+        "status": "PLAYING | FINISHED",
         "turnSeconds": 20,
         "createdAt": 1729780000000
       },
@@ -255,8 +329,9 @@ El cliente **no** salta de un estado a otro: reproduce los eventos en orden en u
   "hands":    { "{matchId}": { "{uid}": [1, 1, 4, 6, 9, 11, 12] } },   // lee SOLO el dueño
   "secret":   { "{matchId}": { "center": [5, 2, null, 7, 7, 3, 8, 12], "seed": "…" } }, // nadie
   "presence": { "{uid}": { "online": true, "lastSeen": 0, "matchId": "…" } },
-  "roomCodes":{ "K7M2QX": "{matchId}" },
-  "queue":    { "CLASSIC_4": { "{matchId}": { "seats": 2, "openUntil": 0 } } }
+  "roomCodes":{ "TRN-7K4Q": "{roomId}" },
+  "openRooms":{ "{roomId}": { "name": "Sala de Miguel", "players": 3, "max": 6, "ruleSet": "TRIO_CLASSIC" } }, // índice de salas públicas
+  "queue":    { "TRIO_CLASSIC_4": { "{roomId}": { "seats": 2, "openUntil": 0 } } }
 }
 ```
 
@@ -271,6 +346,10 @@ El cliente **no** salta de un estado a otro: reproduce los eventos en orden en u
     }},
     "hands": { "$m": { "$uid": { ".read": "auth != null && auth.uid === $uid" } } },
     "secret": { ".read": false },
+    "openRooms": { ".read": "auth != null" },
+    "rooms": { "$r": {
+      ".read": "auth != null && root.child('rooms/'+$r+'/members/'+auth.uid).exists()"
+    }},
     "presence": { "$uid": {
       ".read": "auth != null",
       ".write": "auth != null && auth.uid === $uid"
@@ -325,11 +404,13 @@ El **motor es una función pura y determinista**: misma semilla + mismas accione
 2. Si no hay ninguna, crea una y la publica en la cola.
 3. Arranca al llenarse **o** a los 20 s (Remote Config): los puestos vacíos se completan con **bots**. Clave en el lanzamiento, cuando hay pocos jugadores.
 
-### 6.3 Salas privadas
+### 6.3 Salas creadas por jugadores (privadas y públicas)
 
-- Código de 6 caracteres sin ambiguos (sin `0/O/1/I`), reservado con transacción en `/roomCodes`.
-- Enlace `https://terna.web.app/sala/K7M2QX` (App Link): abre la app directamente en el lobby; sin la app, lleva a Play Store.
-- El anfitrión elige modo, nº de jugadores, tiempo de turno, si rellena con bots y si activa el modo Aprendiz.
+- **Código:** el diseño usa `TRN-749` (3 dígitos = solo 1.000 combinaciones, fácil de adivinar y de agotar). Se mantiene el prefijo visual `TRN-`, pero con **4–5 caracteres alfanuméricos sin ambiguos** (sin `0/O/1/I`), por ejemplo `TRN-7K4Q`. Se reserva con transacción en `/roomCodes`.
+- **Enlace:** `https://terna.web.app/sala/TRN-7K4Q` (App Link). Abre la app directamente en la sala de espera; sin la app, lleva a Play Store.
+- **Salas públicas:** se publican en el índice `/openRooms` (solo `WAITING`, con puestos libres). La pantalla "Salas disponibles" lo escucha en tiempo real, limitado a ~20 filas. Al llenarse o empezar, la sala sale del índice.
+- **Anfitrión:** elige nº de jugadores y privacidad (en el diseño), y además modo, tiempo de turno y relleno con bots (por añadir). Puede **expulsar** jugadores (botón ✕ rojo): callable `kickPlayer`. Si el anfitrión se va, la sala pasa al siguiente jugador más antiguo.
+- **Callables nuevas:** `createRoom`, `joinRoom(code | roomId)`, `leaveRoom`, `kickPlayer`, `startMatch`, `listOpenRooms` (o lectura directa del índice).
 
 ### 6.4 Turnos, desconexiones y bots
 
@@ -415,7 +496,36 @@ Recomendación:
 | Ícono de la app | **Adaptive icon** (capa frontal + fondo) desde `IconoTerna` | — |
 | Logo TERNA games | PNG/WebP para el splash (`SplashScreen API`) | — |
 
-Además, en `Tablero HD` y `Galería` hay **dos estilos de cartas** (el primer 1–7 y el set completo 1–12). Hay que elegir uno antes de empezar el design system.
+Ya existen exportaciones PNG en `diseño/diseño cartas y splash/`: se convierten a WebP en Android Studio.
+
+**Estilo de carta:** todas las pantallas de la app usan el set completo 1–12 (marco negro con número grande), que queda como el estilo oficial.
+
+### 8.1 Design system (extraído de las pantallas)
+
+| Token | Valor | Uso |
+|---|---|---|
+| `primary` | `#FDE047` | Botones principales, bordes de paneles y modales, acentos |
+| `onPrimary` | casi negro `#1A1410` | Texto de botones amarillos |
+| `surface` | `#19110F` – `#2B2026` (marrón oscuro, semitransparente) | Paneles y modales sobre los fondos ilustrados |
+| `surfaceVariant` | `#2A2220` | Filas de lista, puestos de la sala |
+| `danger` | `#FF383C` | Expulsar jugador |
+| `facebook` | azul Facebook | Botón de registro |
+| Tipografía títulos | Sans condensada en negrita (tipo *Roboto Condensed*) | "SALA DE MIGUEL", "¡Iniciando Partida!" |
+| Tipografía texto | Sans geométrica (tipo *Inter*) | Cuerpo, botones |
+| Logo | "TERNA!" 3D amarillo | Imagen, no tipografía |
+| Forma | Esquinas ~12–16 dp, borde amarillo de 1,5–2 dp | Paneles, botones |
+
+Confirmar los nombres exactos de las fuentes en Figma.
+
+Componentes base para `core/designsystem`: `TernaPanel` (panel oscuro con borde amarillo), `TernaPrimaryButton`, `TernaOutlineButton`, `TernaModal`, `PlayerSlot` (ocupado / vacío / anfitrión / con expulsar), `Stepper`, `TernaSwitch`, `CodeField`, `CardView` (anverso / reverso / volteando), `OpponentBadge`, `LoadingCards` (las cartas girando de los modales).
+
+### 8.2 Tamaños de frame
+
+Los frames tienen proporciones distintas: 932×430 (2,17:1, teléfono), 960×540 (16:9), 1440×900 y 1600×1000 (16:10, tablet). Para Compose conviene:
+
+- Diseñar sobre un frame base de teléfono en **dp**, por ejemplo **800×360 dp** (el teléfono Android más común en horizontal), y revisar cada pantalla también en 915×412 dp y en tablet 1280×800 dp.
+- Respetar la zona del *notch* o cámara a un lado y la barra de gestos: `WindowInsets.safeDrawing`.
+- Fondos con `ContentScale.Crop` y paneles con anchos máximos, no posiciones absolutas.
 
 Considera **Play Asset Delivery** si en el futuro añades muchas mesas o cartas cosméticas.
 
@@ -442,17 +552,25 @@ Considera **Play Asset Delivery** si en el futuro añades muchas mesas o cartas 
 | 0 | Repos, proyectos Firebase dev/prod, emuladores, CI, assets exportados | 1 semana |
 | 1 | **Motor de reglas TS + tests + bots** (jugable por consola) | 2 semanas |
 | 2 | Callables, reglas RTDB, sala privada de extremo a extremo con 3 teléfonos | 2 semanas |
-| 3 | App: Splash, invitado, Home, Lobby, **Tablero con animaciones** | 3–4 semanas |
-| 4 | Partida rápida pública, relleno con bots, presencia y reconexión, timeouts | 2 semanas |
-| 5 | Pulido: sonido, hápticos, tutorial, Crashlytics, beta cerrada | 2 semanas |
-| 6+ | Login Google, perfil/XP, ranking, modo equipos, cosméticos, Play Billing | — |
+| 3 | App: Splash, Login (invitado + Google), Home, Crear/Unirse, Sala de espera, **Tablero con animaciones** | 3–4 semanas |
+| 4 | Salas públicas ("Salas disponibles"), partida rápida, relleno con bots, presencia y reconexión, timeouts | 2 semanas |
+| 5 | Pulido: sonido, hápticos, tutorial, login con Facebook (requiere app y revisión en Meta), Crashlytics, beta cerrada | 2 semanas |
+| 6+ | Perfil/XP, ranking, modo equipos, modo CUARTA, cosméticos, Play Billing | — |
 
 ---
 
 ## 11. Decisiones abiertas
 
-1. **Orientación:** el arte es 16:9 → recomiendo **horizontal fija** en el tablero. ¿Home también horizontal?
-2. **Estilo de carta definitivo** (ver §8).
+1. ~~Orientación~~ → **horizontal en toda la app** (así está diseñada).
+2. ~~Estilo de carta~~ → set 1–12 de marco negro (ver §8).
 3. **¿2 jugadores?** El original es de 3 a 6. Se puede permitir 1 humano + bots para práctica.
-4. **Región de Firebase**: medir latencia desde Colombia a `us-east1` y `southamerica-east1` antes de crear el proyecto.
+4. ~~Región de Firebase~~ → `us-central1` para todo (lo impone Realtime Database).
 5. **Monetización** (anuncios recompensados o cosméticos), que condiciona la fase 6.
+6. **Partida rápida:** ¿siempre de 4 jugadores (el modal dice "1/4") o el jugador elige? ¿Qué modo de juego usa?
+7. **¿Botón "Listo" por jugador?** La sala de espera dice "Esperando que todos estén listos…" pero no hay forma de marcarse listo.
+8. **"Ingresar código" (modal) vs. campo de código** en "Unirse a sala": hay dos entradas para lo mismo. ¿Cuándo aparece el modal?
+9. ~~Reglas del turno~~ → configurables (§1.1.1). Falta decidir los **valores por defecto** de cada sala y si el anfitrión puede cambiarlos desde "Crear sala".
+10. **"Cerrar sesión" del invitado** borra para siempre su cuenta anónima y su progreso. En "Ajustes invitado" conviene cambiarlo por "Vincular cuenta (Google / Facebook)" y advertir antes de salir.
+11. **Avatares:** el perfil con cuenta usa la foto de Google; el invitado, la mascota. Recomiendo un set de avatares predefinidos (jaguar, cóndor…) en lugar de subir fotos, porque así no hace falta Storage ni moderación de imágenes.
+12. **"Ternas ganadas" en el perfil:** ¿son partidas ganadas o ternas formadas? Definirlo, porque cambia `stats`.
+13. **Imagen de tragamonedas en el Jackpot 777:** Google Play pregunta por "juegos de azar simulados" al clasificar la app, y los íconos de tragamonedas pueden subir la clasificación de edad. Las cartas doradas de `ImagenGanar7` transmiten lo mismo sin ese riesgo.

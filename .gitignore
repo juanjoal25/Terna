@@ -1,0 +1,4 @@
+node_modules/
+backend/functions/lib/
+*.log
+.firebase/
