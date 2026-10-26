@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Únete a la sala · TERNA!</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #19110f; color: #fff; font-family: system-ui, sans-serif; text-align: center; padding: 16px; box-sizing: border-box; }
+    h1 { color: #fde047; margin: 0 0 .5rem; }
+    code { font-size: 1.5rem; color: #fde047; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>¡Te invitaron a jugar TERNA!</h1>
+    <p>Abre este enlace desde tu teléfono con la app instalada, o ingresa el código en "Unirse a sala":</p>
+    <p><code id="code"></code></p>
+    <!-- Cuando la app esté publicada: botón a Google Play. -->
+  </main>
+  <script>
+    // /sala/TRN-7K4Q → muestra el código para escribirlo a mano.
+    const code = decodeURIComponent(location.pathname.split("/").filter(Boolean)[1] || "");
+    document.getElementById("code").textContent = /^TRN-[A-Z0-9]{4,5}$/.test(code) ? code : "";
+  </script>
+</body>
+</html>

@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Función auxiliar para verificar autenticación
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,45 +10,68 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Perfil de usuario y estadísticas
+    function isAnonymousSession() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // Validaciones de los únicos campos que el cliente puede escribir en su perfil.
+    function validDisplayName(name) {
+      return name is string && name.size() >= 1 && name.size() <= 20;
+    }
+
+    function validAvatar(avatar) {
+      return avatar is string && avatar.matches('^[a-z0-9_]{1,32}$');
+    }
+
+    // Perfil, estadísticas y economía del jugador
     match /users/{userId} {
-      // Cualquier usuario autenticado puede leer perfiles (para ver nombres/avatares en sala)
+      // Cualquier usuario autenticado puede leer perfiles (nombres y avatares en la sala)
       allow read: if isAuthenticated();
 
-      // Creación inicial del perfil en el primer login
+      // Creación en el primer login: solo estos campos, con valores iniciales fijos.
+      // `stats` no puede venir del cliente: lo crea el servidor al terminar la primera partida.
       allow create: if isOwner(userId)
-                    && request.resource.data.keys().hasAll(['displayName', 'avatar', 'isAnonymous', 'createdAt'])
-                    && request.resource.data.level == 1
-                    && request.resource.data.xp == 0
-                    && request.resource.data.coins == 0;
+        && request.resource.data.keys().hasOnly(['displayName', 'avatar', 'anonymous', 'createdAt', 'lastLoginAt', 'level', 'xp', 'coins'])
+        && request.resource.data.keys().hasAll(['displayName', 'avatar', 'anonymous', 'createdAt', 'level', 'xp', 'coins'])
+        && validDisplayName(request.resource.data.displayName)
+        && validAvatar(request.resource.data.avatar)
+        && request.resource.data.anonymous == isAnonymousSession()
+        && request.resource.data.createdAt == request.time
+        && (!('lastLoginAt' in request.resource.data) || request.resource.data.lastLoginAt == request.time)
+        && request.resource.data.level == 1
+        && request.resource.data.xp == 0
+        && request.resource.data.coins == 0;
 
-      // Solo el usuario puede actualizar sus datos COSMÉTICOS (nombre, avatar)
-      // NUNCA puede modificarse directamente nivel, xp, monedas ni estadísticas desde el cliente.
+      // El usuario solo cambia datos cosméticos y su última conexión.
+      // `anonymous` solo puede pasar a false, y solo con una sesión ya vinculada (Google/Facebook).
       allow update: if isOwner(userId)
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['level', 'xp', 'coins', 'stats', 'createdAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'avatar', 'lastLoginAt', 'anonymous'])
+        && validDisplayName(request.resource.data.displayName)
+        && validAvatar(request.resource.data.avatar)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastLoginAt'])
+            || request.resource.data.lastLoginAt == request.time)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['anonymous'])
+            || (request.resource.data.anonymous == false && !isAnonymousSession()));
 
-      // Borrado de cuenta por el propio usuario (exigencia Google Play)
-      allow delete: if isOwner(userId);
+      // El borrado completo de cuenta (Auth + perfil + historial) lo hace la función deleteAccount.
+      allow delete: if false;
 
-      // Historial de partidas del usuario (subcolección)
+      // Historial personal de partidas: solo lo escribe el servidor
       match /matchHistory/{matchId} {
-        // Solo el dueño puede leer su historial de partidas
         allow read: if isOwner(userId);
-        // Ningún cliente puede escribir o alterar el historial; solo Cloud Functions (Admin SDK)
         allow write: if false;
       }
     }
 
-    // Historial global / archivo de partidas
-    match /matchHistory/{matchId} {
-      allow read: if isAuthenticated() && request.auth.uid in resource.data.players;
+    // Archivo global de partidas (para auditoría y repeticiones). `playerUids` = lista de UIDs.
+    match /matchArchive/{matchId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.playerUids;
       allow write: if false;
     }
 
-    // Tablas de clasificación / Ranking por temporada
+    // Ranking por temporada: solo lo calcula el servidor
     match /leaderboards/{season}/entries/{userId} {
       allow read: if isAuthenticated();
-      // Solo el servidor calcula y actualiza puntajes en leaderboards
       allow write: if false;
     }
   }

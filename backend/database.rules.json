@@ -44,14 +44,27 @@
 
     "queue": {
       ".read": false,
-      ".write": false
+      ".write": false,
+      "$queueKey": {
+        ".indexOn": ["createdAt"]
+      }
+    },
+
+    "activeMatch": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
     },
 
     "presence": {
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['online', 'lastSeen'])"
+        ".validate": "newData.hasChildren(['online', 'lastSeen'])",
+        "online": { ".validate": "newData.isBoolean()" },
+        "lastSeen": { ".validate": "newData.isNumber() && newData.val() <= now" },
+        "$other": { ".validate": false }
       }
     }
   }

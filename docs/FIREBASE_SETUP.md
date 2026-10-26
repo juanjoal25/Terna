@@ -38,7 +38,7 @@
 
 Firebase console → **Agregar proyecto**.
 
-- [ ] Nombre `terna-dev`. Revisa que el **ID del proyecto** quede `terna-dev`, porque no se puede cambiar después.
+- [ ] Nombre `terna-dev`. Si el ID `terna-dev` ya está ocupado, Firebase le agrega un sufijo. **El ID real de dev es `terna-dev-718c7`**: ese es el que va en `backend/.firebaserc`, no el nombre visible.
 - [ ] Google Analytics: **activado** y crear una cuenta "TERNA". Lo usan Crashlytics y Remote Config.
 - [ ] Repetir con `terna-prod`.
 
@@ -352,7 +352,10 @@ backend/
   }
   ```
 - [ ] Permite tráfico HTTP sin cifrar **solo en debug** hacia esas IP (`network_security_config.xml` en `src/debug/`).
-- [ ] Las reglas de seguridad se prueban contra el emulador con `@firebase/rules-unit-testing`. Por ejemplo: "un jugador NO puede leer la mano de otro".
+- [ ] Las reglas de seguridad tienen pruebas en `backend/rules-tests/`: levantan los emuladores de Firestore y Realtime Database con el proyecto `demo-terna`, que no necesita iniciar sesión. Corre esto **antes de publicar cualquier cambio de reglas**, desde `backend/rules-tests`:
+  ```bash
+  npm test
+  ```
 
 ---
 

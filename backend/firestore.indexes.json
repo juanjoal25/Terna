@@ -1,18 +1,11 @@
 {
   "indexes": [
     {
-      "collectionGroup": "matchHistory",
+      "collectionGroup": "matchArchive",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "players", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "playerUids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "endedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "entries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "score", "order": "DESCENDING" }
       ]
     }
   ],

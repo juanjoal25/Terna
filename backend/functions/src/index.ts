@@ -1,24 +1,18 @@
 /**
- * TERNA! — Cloud Functions Entrypoint (2nd Gen, us-central1)
+ * TERNA! — Punto de entrada de Cloud Functions (2.ª generación, us-central1)
  *
- * Este archivo centraliza la conexión de Firebase con el backend.
- * Las funciones se despliegan en us-central1 para garantizar mínima latencia
- * con Realtime Database.
+ * Aquí solo se exportan funciones: Firebase despliega cada export como un endpoint.
+ * Los módulos que necesiten base de datos importan `./db.js` directamente.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
-import { onCall } from "firebase-functions/v2/https";
-import { rtdb, firestore, rtdbRefs, firestoreCols } from "./db.js";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
-// Configuración regional global para 2ª generación
-setGlobalOptions({ region: "us-central1" });
+// Misma región que Realtime Database. `maxInstances` pone un tope al gasto si algo se descontrola.
+setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
-// Exportar utilidades de conexión a base de datos para que los módulos las consuman
-export { rtdb, firestore, rtdbRefs, firestoreCols };
-
-/**
- * Health check básico para verificar conectividad desde el cliente Android
- */
-export const ping = onCall(async () => {
+/** Health check para verificar desde Android que la app llega al backend. */
+export const ping = onCall((request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión para usar TERNA!");
   return {
     status: "ok",
     region: "us-central1",

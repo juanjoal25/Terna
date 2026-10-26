@@ -1,7 +1,7 @@
 {
   "projects": {
-    "default": "terna-dev",
-    "dev": "terna-dev",
+    "default": "terna-dev-718c7",
+    "dev": "terna-dev-718c7",
     "prod": "terna-prod"
   }
 }

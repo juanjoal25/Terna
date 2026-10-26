@@ -1,0 +1,14 @@
+{
+  "name": "terna-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --config ../firebase.json --only firestore,database --project demo-terna \"vitest run\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.1.0",
+    "firebase-tools": "^15.34.1",
+    "vitest": "^5.0.5"
+  }
+}

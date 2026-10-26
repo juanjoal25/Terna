@@ -55,18 +55,22 @@ Con la confirmación del modelo **100% Online**, se implementan las siguientes o
    - Esto anula completamente la posibilidad de trampas, partidas inventadas o hackeo de monedas/XP.
 
 2. **Aislamiento de la Rama de Juego en RTDB (`/matches/{matchId}/live`):**
-   - Para no incurrir en costos excesivos de ancho de banda (over-fetching) ni saturar la memoria del teléfono, los datos que cambian en cada jugada (`turn`, `revealed`, `lastEvent`, `seq`) están aislados en el subnodo `live`.
+   - Para no incurrir en costos excesivos de ancho de banda (over-fetching) ni saturar la memoria del teléfono, los datos que cambian en cada jugada (`turn`, `revealed`, `lastEvents`, `seq`) están aislados en el subnodo `live`.
    - La metadata (`meta`) y los datos fijos de los jugadores (`players`) no se vuelven a descargar en cada micro-acción.
 
-3. **Eventos Atómicos en vez de Arrays:**
-   - Se reemplazó el array `lastEvents: []` por el objeto atómico `lastEvent: { seq, type, player, value }` para evitar sobrescrituras de datos concurrentes entre jugadores.
+3. **Eventos de la última jugada (`lastEvents`):**
+   - Una sola jugada produce **varios eventos seguidos**: revelar → fallo → cambio de turno; "-1000 de aura" → fallo → turno; terna → victoria. Si solo se guardara el último, se perdería la carta que no coincidió (al fallar, `revealed` se vacía) y el mensaje de "-1000 de aura".
+   - `live.lastEvents` guarda **todos los eventos de la última jugada**, en orden y con su `seq`. Lo genera `toPublicEvent()` del motor.
+   - No hay riesgo de que dos escrituras se pisen: solo escribe el servidor, dentro de una transacción.
+   - Si la app detecta un hueco en `seq` (por ejemplo, volvió de segundo plano), no anima: se sincroniza con el estado.
 
 4. **Acceso Seguro y Flexible a Salas (`rooms`):**
    - La regla de RTDB permite que un usuario consulte la información de una sala si es de tipo `PUBLIC` antes de unirse, o si ya figura en `members`. Las salas privadas requieren validación de código mediante Cloud Functions.
 
 5. **Índices Optimizados:**
    - Índice en RTDB (`.indexOn: ["createdAt", "ruleSet"]`) para la lista de salas disponibles sin sobrecargar la red móvil.
-   - Índice compuesto en Firestore para consultar el historial de partidas ordenado por fecha de finalización.
+   - Índice en RTDB `queue/{clave}.createdAt` para que el emparejamiento tome primero a quien lleva más tiempo esperando.
+   - Índice compuesto en Firestore `matchArchive: playerUids + endedAt` para el archivo global. El historial personal (`users/{uid}/matchHistory` ordenado por `endedAt`) y el ranking (`score`) usan índices de un solo campo, que Firestore crea automáticamente: declararlos como compuestos hace fallar el despliegue.
 
 6. **Estadísticas Embebidas en Firestore:**
    - Las estadísticas de los modos de juego (`TERNA_CLASSIC`, `TERNA_SPICY`, `TRIO_ORIGINAL`, `CUARTA`) se guardan directamente dentro del documento del usuario `users/{uid}`. Cargar el perfil consume **1 sola lectura de Firestore** en lugar de múltiples lecturas de subcolecciones.
@@ -92,18 +96,20 @@ Ubicación: **`us-central1`**.
       "createdAt": 1729780000000,
       "updatedAt": 1729780000000,
       "config": {
-        "ruleSet": "TERNA_CLASSIC",       // "TERNA_CLASSIC" | "TERNA_SPICY" | "TRIO_ORIGINAL" | "CUARTA"
+        "ruleSet": "TERNA_CLASSIC",       // "TERNA_CLASSIC" | "TERNA_SPICY" | "TRIO_ORIGINAL" | (futuro) "CUARTA"
         "turnSeconds": 20,
-        "allowPass": false,
-        "allowClaim": true,
-        "fillWithBots": true
+        "fillWithBots": true,
+        "options": {                      // Cambios sobre el modo base: mismas claves que TurnOptions del motor
+          "allowPass": false,             // Solo se guardan las opciones que el anfitrión cambió
+          "allowClaim": true
+        }
       },
       "members": {
         "{uid}": {
           "name": "Felipe",
           "avatar": "jaguar_01",
-          "isReady": true,
-          "isHost": true,
+          "ready": true,
+          "host": true,
           "joinedAt": 1729780000000
         }
       }
@@ -163,14 +169,16 @@ Ubicación: **`us-central1`**.
           { "source": "HAND", "owner": "{uid}", "end": "HIGH", "value": 9, "claimed": false },
           { "source": "CENTER", "slot": 4, "value": 9 }
         ],
-        "center": [true, true, false, true, true, true, true, true], // true = carta oculta en mesa
-        "lastEvent": {
-          "seq": 42,
-          "type": "CARD_REVEALED",
-          "player": "{uid}",
-          "value": 9
-        },
-        "winner": null
+        "center": [true, true, false, true, true, true, true, true], // true = carta oculta en mesa (sin null: nunca se recorta)
+        "lastEvents": [                   // Todos los eventos de la última jugada, en orden
+          { "seq": 41, "type": "CARD_REVEALED", "player": "{uid}",
+            "reveal": { "source": "HAND", "owner": "{uid2}", "end": "LOW", "value": 4, "claimed": false } },
+          { "seq": 42, "type": "TURN_FAILED", "player": "{uid}", "revealed": [ /* cartas del turno */ ] },
+          { "seq": 43, "type": "TURN_STARTED", "player": "{uid3}", "number": 13 }
+          // Otros tipos: CLAIM_FAILED { target, value, taunt: "AURA_MINUS_1000" },
+          // SET_COMPLETED { value, cards }, TURN_PASSED { revealed }, GAME_OVER { result }
+        ],
+        "result": null                    // Al terminar: { "winners": ["{uid}"], "reason": "SETS" | "INSTANT" | "LINKED" | "EXHAUSTED" }
       }
     }
   },
@@ -182,25 +190,31 @@ Ubicación: **`us-central1`**.
     }
   },
 
-  // 6. CENTRO OCULTO (100% Bloqueado para clientes)
+  // 6. ESTADO COMPLETO DEL MOTOR (100% bloqueado para clientes)
+  //    Se guarda como TEXTO JSON (serializeState/deserializeState en db.ts): RTDB borra los null
+  //    del final de un arreglo, y el centro usa null para los huecos vacíos.
   "secret": {
     "{matchId}": {
-      "center": [5, 2, null, 7, 7, 3, 8, 12],
+      "state": "{\"players\":[...],\"hands\":{...},\"center\":[5,2,null,7,7,3,8,null],...}",
       "seed": "f48c3b7a89e1"
     }
   },
 
-  // 7. PRESENCIA (onDisconnect nativo)
+  // 7. PARTIDA ACTIVA DE CADA JUGADOR (la escribe el servidor; la lee solo el dueño)
+  //    La app la consulta al abrir para reconectarse a una partida en curso.
+  "activeMatch": {
+    "{uid}": "{matchId}"
+  },
+
+  // 7b. PRESENCIA (onDisconnect nativo). Solo estos dos campos; las reglas rechazan cualquier otro.
   "presence": {
     "{uid}": {
       "online": true,
-      "lastSeen": 1729780200000,
-      "currentRoomId": "{roomId}",
-      "currentMatchId": "{matchId}"
+      "lastSeen": 1729780200000           // ServerValue.TIMESTAMP; no se acepta una fecha futura
     }
   },
 
-  // 8. COLA DE EMPAREJAMIENTO RÁPIDO
+  // 8. COLA DE EMPAREJAMIENTO RÁPIDO (índice en createdAt)
   "queue": {
     "TERNA_CLASSIC_4": {
       "{ticketId}": {
@@ -211,6 +225,8 @@ Ubicación: **`us-central1`**.
   }
 }
 ```
+
+**Por qué los arreglos públicos no usan `null`:** RTDB guarda los arreglos como objetos con claves numéricas y no almacena valores `null`. Un arreglo como `[5, 2, 7, null]` vuelve como `[5, 2, 7]`. Por eso `live.center` usa `true/false` y el estado del motor (con huecos `null`) se guarda como texto.
 
 ---
 
@@ -223,15 +239,19 @@ Documento de perfil, estadísticas y economía del jugador.
 
 | Campo | Tipo | Quién escribe | Descripción |
 |---|---|---|---|
-| `displayName` | `string` | Cliente / Servidor | Nombre público |
-| `avatar` | `string` | Cliente / Servidor | ID de recurso de avatar (`"jaguar_01"`) |
-| `isAnonymous` | `boolean` | Servidor / Auth | Si es cuenta de invitado |
-| `level` | `number` | **Solo Servidor** | Nivel de usuario (inicia en 1) |
-| `xp` | `number` | **Solo Servidor** | Experiencia acumulada |
-| `coins` | `number` | **Solo Servidor** | Monedas ganadas en partidas |
-| `createdAt` | `timestamp` | Cliente (creación) | Fecha de registro |
-| `lastLoginAt` | `timestamp` | Cliente / Servidor | Última sesión activa |
-| `stats` | `map` | **Solo Servidor** | Mapa de estadísticas por modo de juego |
+| `displayName` | `string` (1–20 caracteres) | Cliente / Servidor | Nombre público |
+| `avatar` | `string` (`a-z 0-9 _`, máx. 32) | Cliente / Servidor | ID de recurso de avatar (`"jaguar_01"`) |
+| `anonymous` | `boolean` | Cliente (debe coincidir con la sesión) | Si es cuenta de invitado. Solo puede pasar de `true` a `false`, tras vincular Google/Facebook |
+| `level` | `number` | **Solo Servidor** (el cliente crea con `1`) | Nivel de usuario |
+| `xp` | `number` | **Solo Servidor** (el cliente crea con `0`) | Experiencia acumulada |
+| `coins` | `number` | **Solo Servidor** (el cliente crea con `0`) | Monedas ganadas en partidas |
+| `createdAt` | `timestamp` | Cliente, con `serverTimestamp()` | Fecha de registro |
+| `lastLoginAt` | `timestamp` | Cliente, con `serverTimestamp()` | Última sesión activa |
+| `stats` | `map` | **Solo Servidor** (no existe hasta la primera partida) | Mapa de estadísticas por modo de juego |
+
+Reglas: al crear el perfil, el cliente solo puede enviar estos campos, con `level = 1`, `xp = 0`, `coins = 0` y las fechas puestas por el servidor. Al actualizar, solo puede cambiar `displayName`, `avatar`, `lastLoginAt` y `anonymous`. El cliente **no** puede borrar el perfil: el borrado de cuenta lo hace la función `deleteAccount` (Auth + perfil + historial).
+
+> Los campos booleanos no empiezan por `is`: el SDK de Firebase para Kotlin/Java convierte `isAnonymous` en `anonymous` al leer y escribir, y los nombres dejarían de coincidir.
 
 **Estructura del mapa `stats` en `users/{uid}`:**
 ```json
@@ -267,9 +287,18 @@ Historial personal de partidas del usuario. Solo el servidor escribe aquí al fi
 | `ruleSet` | `string` | Modo de juego (`"TERNA_CLASSIC"`, `"TERNA_SPICY"`) |
 | `result` | `string` | `"VICTORY"` o `"DEFEAT"` |
 | `reason` | `string` | `"SETS"`, `"INSTANT"`, `"LINKED"` |
-| `players` | `array<map>` | Lista de oponentes: `[{ uid, name, avatar, setsCount, isWinner }]` |
+| `players` | `array<map>` | Lista de jugadores: `[{ uid, name, avatar, setsCount, winner }]` |
 | `durationSec` | `number` | Duración de la partida en segundos |
 | `endedAt` | `timestamp` | Fecha y hora de finalización |
+
+### 4.2b Colección: `matchArchive/{matchId}`
+Archivo global de partidas (auditoría y repeticiones). Lo escribe solo el servidor. Se llama distinto al historial personal para que no se mezclen en consultas de *collection group*.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `playerUids` | `array<string>` | UIDs de quienes jugaron. Lo usan la regla de lectura y el índice `playerUids + endedAt` |
+| `players` | `array<map>` | Igual que en el historial personal |
+| `ruleSet`, `result`, `seed`, `durationSec`, `endedAt` | — | `result = { winners, reason }`; `seed` permite reproducir la partida con el motor |
 
 ---
 
@@ -291,8 +320,14 @@ Ranking por temporadas.
 ```kotlin
 package com.ternagames.terna.core.model
 
+import com.google.firebase.Timestamp
 import com.google.firebase.database.IgnoreExtraProperties
-import com.google.firebase.database.PropertyName
+import com.google.firebase.firestore.ServerTimestamp
+
+// Reglas para que los modelos se lean bien con el SDK de Firebase:
+// - Todos los campos con valor por defecto (el SDK necesita un constructor vacío).
+// - Ningún booleano empieza por "is": el SDK convierte isReady en "ready" y deja de coincidir.
+// - Las fechas de Firestore son Timestamp, no Long (leerlas como Long hace fallar la app).
 
 // ==========================================
 // MODELOS DE REALTIME DATABASE (EN VIVO)
@@ -301,13 +336,13 @@ import com.google.firebase.database.PropertyName
 @IgnoreExtraProperties
 data class RoomDto(
     val name: String = "",
-    val type: String = "PUBLIC",
+    val type: String = "PUBLIC",            // PUBLIC | PRIVATE | QUICKPLAY
     val hostUid: String = "",
     val code: String = "",
     val maxPlayers: Int = 4,
     val status: String = "WAITING",
     val currentMatchId: String? = null,
-    val createdAt: Long = 0L,
+    val createdAt: Long = 0L,               // En RTDB las fechas sí son milisegundos (ServerValue.TIMESTAMP)
     val updatedAt: Long = 0L,
     val config: RoomConfigDto = RoomConfigDto(),
     val members: Map<String, RoomMemberDto> = emptyMap()
@@ -317,17 +352,16 @@ data class RoomDto(
 data class RoomConfigDto(
     val ruleSet: String = "TERNA_CLASSIC",
     val turnSeconds: Int = 20,
-    val allowPass: Boolean = false,
-    val allowClaim: Boolean = true,
-    val fillWithBots: Boolean = true
+    val fillWithBots: Boolean = true,
+    val options: Map<String, Any> = emptyMap() // Claves de TurnOptions que el anfitrión cambió
 )
 
 @IgnoreExtraProperties
 data class RoomMemberDto(
     val name: String = "",
     val avatar: String = "jaguar_01",
-    @get:PropertyName("isReady") val isReady: Boolean = false,
-    @get:PropertyName("isHost") val isHost: Boolean = false,
+    val ready: Boolean = false,
+    val host: Boolean = false,
     val joinedAt: Long = 0L
 )
 
@@ -337,8 +371,8 @@ data class MatchLiveDto(
     val turn: TurnDto = TurnDto(),
     val revealed: List<PublicRevealDto> = emptyList(),
     val center: List<Boolean> = emptyList(),
-    val lastEvent: GameEventDto? = null,
-    val winner: String? = null
+    val lastEvents: List<GameEventDto> = emptyList(),
+    val result: GameResultDto? = null
 )
 
 @IgnoreExtraProperties
@@ -351,20 +385,34 @@ data class TurnDto(
 
 @IgnoreExtraProperties
 data class PublicRevealDto(
-    val source: String = "CENTER",
+    val source: String = "CENTER",          // HAND | CENTER
     val owner: String? = null,
-    val end: String? = null,
+    val end: String? = null,                // LOW | HIGH
     val slot: Int? = null,
     val value: Int = 0,
-    val claimed: Boolean = false
+    val claimed: Boolean = false            // true = se obtuvo deduciendo ("Pedir carta")
 )
 
+/** Un evento del motor. Cada tipo usa solo algunos campos (ver types.ts → GameEvent). */
 @IgnoreExtraProperties
 data class GameEventDto(
     val seq: Long = 0L,
-    val type: String = "",
+    val type: String = "",                  // TURN_STARTED | CARD_REVEALED | CLAIM_FAILED | TURN_FAILED | TURN_PASSED | SET_COMPLETED | GAME_OVER
     val player: String = "",
-    val value: Int? = null
+    val number: Int? = null,                // TURN_STARTED
+    val reveal: PublicRevealDto? = null,    // CARD_REVEALED
+    val revealed: List<PublicRevealDto> = emptyList(), // TURN_FAILED, TURN_PASSED
+    val cards: List<PublicRevealDto> = emptyList(),    // SET_COMPLETED
+    val target: String? = null,             // CLAIM_FAILED
+    val value: Int? = null,                 // CLAIM_FAILED, SET_COMPLETED
+    val taunt: String? = null,              // CLAIM_FAILED → "AURA_MINUS_1000"
+    val result: GameResultDto? = null       // GAME_OVER
+)
+
+@IgnoreExtraProperties
+data class GameResultDto(
+    val winners: List<String> = emptyList(), // Puede haber empate
+    val reason: String = ""                  // SETS | INSTANT | LINKED | EXHAUSTED
 )
 
 // ==========================================
@@ -374,13 +422,13 @@ data class GameEventDto(
 data class UserProfile(
     val displayName: String = "",
     val avatar: String = "jaguar_01",
-    val isAnonymous: Boolean = false,
+    val anonymous: Boolean = true,
     val level: Int = 1,
     val xp: Long = 0L,
     val coins: Long = 0L,
-    val createdAt: Long = System.currentTimeMillis(),
-    val lastLoginAt: Long = System.currentTimeMillis(),
-    val stats: Map<String, ModeStats> = emptyMap()
+    @ServerTimestamp val createdAt: Timestamp? = null,   // null al crear → lo pone el servidor
+    @ServerTimestamp val lastLoginAt: Timestamp? = null,
+    val stats: Map<String, ModeStats> = emptyMap()       // El cliente nunca lo envía al crear
 )
 
 data class ModeStats(
@@ -400,7 +448,7 @@ data class MatchHistoryEntry(
     val reason: String = "SETS",
     val players: List<MatchHistoryPlayer> = emptyList(),
     val durationSec: Int = 0,
-    val endedAt: Long = 0L
+    val endedAt: Timestamp? = null
 )
 
 data class MatchHistoryPlayer(
@@ -408,6 +456,6 @@ data class MatchHistoryPlayer(
     val name: String = "",
     val avatar: String = "",
     val setsCount: Int = 0,
-    val isWinner: Boolean = false
+    val winner: Boolean = false
 )
 ```
