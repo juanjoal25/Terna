@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="terna_splash_background">#19110F</color>
+    <color name="ic_launcher_background">#8A0A04</color>
+
+    <style name="Theme.Terna" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/terna_splash_background</item>
+    </style>
+
+    <!-- Splash del sistema (Android 12+): solo dura mientras arranca la app; luego sigue el splash de Compose. -->
+    <style name="Theme.Terna.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/terna_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Terna</item>
+    </style>
+</resources>

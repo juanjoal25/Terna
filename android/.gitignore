@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+/.idea/
+.DS_Store
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+# google-services.json de prod no se versiona hasta que exista terna-prod
+app/src/prod/google-services.json
