@@ -15,7 +15,7 @@ import com.ternagames.terna.feature.home.ui.SubScreenScaffold
 
 @Composable
 fun CreditsScreen(onBack: () -> Unit, onOpenSettings: () -> Unit) {
-    SubScreenScaffold(title = "CRÉDITOS", onBack = onBack, cornerAction = "AJUSTES" to onOpenSettings) {
+    SubScreenScaffold(title = "CRÉDITOS", onBack = onBack, cornerActions = listOf("AJUSTES" to onOpenSettings)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier) {
             listOf(
                 "Desarrollo y Lógica: Hugo & Espinosa",

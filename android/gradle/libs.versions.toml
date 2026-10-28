@@ -27,6 +27,7 @@ serialization = "1.8.1"
 firebaseBom = "35.1.0"
 googleServices = "4.5.0"
 googleId = "1.2.1"
+coil = "3.6.2"
 
 # Tests
 junit = "4.13.2"
@@ -70,6 +71,9 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 firebase-database = { group = "com.google.firebase", name = "firebase-database" }
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -60,8 +62,12 @@ private const val COMING_SOON = "La partida rápida llega muy pronto. Por ahora 
 
 @Composable
 fun HomeScreen(
+<<<<<<< HEAD
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
+=======
+    onOpenProfile: () -> Unit,
+>>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
     onOpenSettings: () -> Unit,
     onOpenCredits: () -> Unit,
     onSignedOut: () -> Unit,
@@ -74,12 +80,15 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val comingSoon: () -> Unit = { scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(COMING_SOON) } }
 
+    val ready = state as? HomeUiState.Ready
     HomeContent(
-        profile = (state as? HomeUiState.Ready)?.profile,
+        profile = ready?.profile,
+        photoUrl = ready?.photoUrl,
         snackbar = snackbar,
         onCreateRoom = onCreateRoom,
         onJoinRoom = onJoinRoom,
         onQuickPlay = comingSoon,
+        onOpenProfile = onOpenProfile,
         onOpenSettings = onOpenSettings,
         onOpenCredits = onOpenCredits,
     )
@@ -88,10 +97,12 @@ fun HomeScreen(
 @Composable
 internal fun HomeContent(
     profile: PlayerProfile?,
+    photoUrl: String?,
     snackbar: SnackbarHostState,
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
     onQuickPlay: () -> Unit,
+    onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCredits: () -> Unit,
 ) {
@@ -104,7 +115,7 @@ internal fun HomeContent(
         ) {
             // Barra superior: jugador · título · ajustes y créditos
             Box(Modifier.fillMaxWidth()) {
-                PlayerChip(profile, Modifier.align(Alignment.CenterStart))
+                PlayerChip(profile, photoUrl, onOpenProfile, Modifier.align(Alignment.CenterStart))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
                     Text("TERNA", style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), color = TernaColors.White)
                     Text("MENÚ PRINCIPAL", style = MaterialTheme.typography.labelSmall, color = TernaColors.TextMuted)
@@ -141,18 +152,19 @@ internal fun HomeContent(
 }
 
 @Composable
-private fun PlayerChip(profile: PlayerProfile?, modifier: Modifier = Modifier) {
+private fun PlayerChip(profile: PlayerProfile?, photoUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(14.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .width(220.dp)
             .clip(shape)
+            .clickable(role = Role.Button, onClickLabel = "Ver perfil", onClick = onClick)
             .background(TernaColors.Panel)
             .border(1.5.dp, TernaColors.Yellow, shape)
             .padding(6.dp),
     ) {
-        PlayerAvatar(profile?.avatar ?: Avatars.DEFAULT, 44.dp)
+        PlayerAvatar(profile?.avatar ?: Avatars.DEFAULT, 44.dp, photoUrl = photoUrl)
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
@@ -209,7 +221,8 @@ private fun CardImage(@DrawableRes image: Int, modifier: Modifier = Modifier) {
 private fun HomePreview() = TernaTheme {
     HomeContent(
         profile = PlayerProfile("u1", "Guest001", Avatars.DEFAULT, anonymous = true, level = 1, xp = 0, coins = 0),
+        photoUrl = null,
         snackbar = remember { SnackbarHostState() },
-        onCreateRoom = {}, onJoinRoom = {}, onQuickPlay = {}, onOpenSettings = {}, onOpenCredits = {},
+        onCreateRoom = {}, onJoinRoom = {}, onQuickPlay = {}, onOpenProfile = {}, onOpenSettings = {}, onOpenCredits = {},
     )
 }

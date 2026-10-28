@@ -12,9 +12,11 @@ import com.ternagames.terna.feature.auth.loginScreen
 import com.ternagames.terna.feature.auth.splashScreen
 import com.ternagames.terna.feature.home.CreditsRoute
 import com.ternagames.terna.feature.home.HomeRoute
+import com.ternagames.terna.feature.home.ProfileRoute
 import com.ternagames.terna.feature.home.SettingsRoute
 import com.ternagames.terna.feature.home.creditsScreen
 import com.ternagames.terna.feature.home.homeScreen
+import com.ternagames.terna.feature.home.profileScreen
 import com.ternagames.terna.feature.home.settingsScreen
 import com.ternagames.terna.feature.room.CreateRoomRoute
 import com.ternagames.terna.feature.room.JoinRoomRoute
@@ -24,7 +26,11 @@ import com.ternagames.terna.feature.room.joinRoomScreen
 import com.ternagames.terna.feature.room.waitingRoomScreen
 
 /**
+<<<<<<< HEAD
  * Splash → Login → Home → (Crear | Unirse) → Sala de espera → Mesa.
+=======
+ * Splash → Login → Home (+ Perfil, Ajustes y Créditos).
+>>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
  * Al entrar o salir de la sesión se limpia la pila para que "atrás" no regrese al login.
  */
 @Composable
@@ -41,10 +47,20 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
         )
         loginScreen(onSignedIn = { navController.resetTo(HomeRoute) })
         homeScreen(
+<<<<<<< HEAD
             onCreateRoom = { navController.navigate(CreateRoomRoute) { launchSingleTop = true } },
             onJoinRoom = { navController.navigate(JoinRoomRoute) { launchSingleTop = true } },
+=======
+            onOpenProfile = { navController.navigate(ProfileRoute) { launchSingleTop = true } },
+>>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
             onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
             onOpenCredits = { navController.navigate(CreditsRoute) { launchSingleTop = true } },
+            onSignedOut = { navController.resetTo(LoginRoute) },
+        )
+        profileScreen(
+            onBack = navController::popBackStack,
+            onOpenSettings = { navController.navigate(SettingsRoute) { popUpTo(HomeRoute); launchSingleTop = true } },
+            onOpenCredits = { navController.navigate(CreditsRoute) { popUpTo(HomeRoute); launchSingleTop = true } },
             onSignedOut = { navController.resetTo(LoginRoute) },
         )
         settingsScreen(
