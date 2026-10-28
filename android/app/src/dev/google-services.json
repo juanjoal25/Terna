@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "858929285767-0fo4q4nmod0sgmsmq0kfkmhnb183fj2p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ternagames.terna.dev",
+            "certificate_hash": "d67f920dcf9b4f6692e040fa1cb18595887911f5"
+          }
+        },
+        {
           "client_id": "858929285767-n3cgtv8n12ddje0sl1lob8cent12dav0.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

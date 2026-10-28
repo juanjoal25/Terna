@@ -82,6 +82,9 @@ private fun FirebaseUser.toSession(): SessionUser {
         uid = uid,
         anonymous = isAnonymous,
         providerName = provider?.displayName ?: displayName,
-        photoUrl = (provider?.photoUrl ?: photoUrl)?.toString(),
+        photoUrl = (provider?.photoUrl ?: photoUrl)?.toString()?.let(::largeGooglePhoto),
     )
 }
+
+/** Google entrega la foto en 96 px (`…=s96-c`); el perfil la muestra grande, así que se pide en 400 px. */
+internal fun largeGooglePhoto(url: String): String = url.replace(Regex("=s\\d+-c$"), "=s400-c")
