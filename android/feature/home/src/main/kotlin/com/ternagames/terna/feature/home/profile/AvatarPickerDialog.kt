@@ -70,15 +70,6 @@ internal fun AvatarPickerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TernaPanel(Modifier.widthIn(max = 520.dp).padding(16.dp), contentPadding = 16.dp) {
             Box(Modifier.fillMaxWidth()) {
-                IconButton(
-                    onClick = {
-                        audio.play(TernaSfx.UiClick)
-                        onDismiss()
-                    },
-                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Cerrar", tint = TernaColors.TextMuted)
-                }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -112,6 +103,15 @@ internal fun AvatarPickerDialog(
                         onClick = { onConfirm(selected) },
                         modifier = Modifier.width(260.dp),
                     )
+                }
+                IconButton(
+                    onClick = {
+                        audio.play(TernaSfx.UiClick)
+                        onDismiss()
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                ) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Cerrar", tint = TernaColors.TextMuted)
                 }
             }
         }
