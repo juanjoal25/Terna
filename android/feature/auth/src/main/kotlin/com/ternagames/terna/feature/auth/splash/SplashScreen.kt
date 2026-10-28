@@ -35,14 +35,15 @@ import com.ternagames.terna.core.designsystem.theme.TernaTheme
 
 @Composable
 fun SplashScreen(
-    onSignedIn: () -> Unit,
+    onSignedIn: (resumeRoomId: String?) -> Unit,
     onSignedOut: () -> Unit,
     viewModel: SplashViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.destination) {
-        when (state.destination) {
-            SplashDestination.Home -> onSignedIn()
+        when (val destination = state.destination) {
+            SplashDestination.Home -> onSignedIn(null)
+            is SplashDestination.Room -> onSignedIn(destination.roomId)
             SplashDestination.Login -> onSignedOut()
             null -> Unit
         }

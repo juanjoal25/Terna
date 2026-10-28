@@ -12,7 +12,7 @@ data object SplashRoute
 @Serializable
 data object LoginRoute
 
-fun NavGraphBuilder.splashScreen(onSignedIn: () -> Unit, onSignedOut: () -> Unit) {
+fun NavGraphBuilder.splashScreen(onSignedIn: (resumeRoomId: String?) -> Unit, onSignedOut: () -> Unit) {
     composable<SplashRoute> { SplashScreen(onSignedIn = onSignedIn, onSignedOut = onSignedOut) }
 }
 

@@ -62,8 +62,8 @@ private val cardImages = intArrayOf(
     R.drawable.card_09, R.drawable.card_10, R.drawable.card_11, R.drawable.card_12,
 )
 
-/** Proporción de las cartas del diseño (341 × 512). */
-const val CARD_ASPECT_RATIO = 341f / 512f
+/** Proporción de las cartas del diseño (424 × 594). */
+const val CARD_ASPECT_RATIO = 424f / 594f
 
 /** Carta boca arriba (valor 1–12) o boca abajo (`value = null`). Se dimensiona por su alto. */
 @Composable

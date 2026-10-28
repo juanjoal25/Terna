@@ -11,6 +11,8 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.functions
 import com.ternagames.terna.core.data.auth.AuthRepository
 import com.ternagames.terna.core.data.auth.FirebaseAuthRepository
+import com.ternagames.terna.core.data.room.FirebaseRoomRepository
+import com.ternagames.terna.core.data.room.RoomRepository
 import com.ternagames.terna.core.data.user.FirestoreUserRepository
 import com.ternagames.terna.core.data.user.UserRepository
 import dagger.Binds
@@ -67,4 +69,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun userRepository(impl: FirestoreUserRepository): UserRepository
+
+    @Binds
+    abstract fun roomRepository(impl: FirebaseRoomRepository): RoomRepository
 }

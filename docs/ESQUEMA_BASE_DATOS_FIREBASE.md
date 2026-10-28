@@ -134,7 +134,10 @@ Ubicación: **`us-central1`**.
     "TRN-7K4Q": "{roomId}"
   },
 
-  // 4. PARTIDAS EN VIVO (Matches)
+  // 4. PARTIDAS EN VIVO. Todo lo de una partida cuelga de UN solo nodo para poder actualizarlo
+  //    en una única transacción atómica (dos jugadas simultáneas nunca dejan la mesa a medias).
+  //    Las reglas de lectura se declaran por rama: meta/players/live = jugadores de la partida;
+  //    hands/{uid} = solo su dueño; secret = nadie. `matches/{id}` completo no se puede leer.
   "matches": {
     "{matchId}": {
       "meta": {
@@ -179,34 +182,25 @@ Ubicación: **`us-central1`**.
           // SET_COMPLETED { value, cards }, TURN_PASSED { revealed }, GAME_OVER { result }
         ],
         "result": null                    // Al terminar: { "winners": ["{uid}"], "reason": "SETS" | "INSTANT" | "LINKED" | "EXHAUSTED" }
+      },
+      "hands": {                          // Cada jugador lee ÚNICAMENTE su propia rama
+        "{uid}": [1, 1, 4, 6, 9, 11, 12]  // Ordenada de menor a mayor
+      },
+      "secret": {                         // 100% bloqueado para clientes
+        // Estado completo del motor como TEXTO JSON: RTDB borra los null del final de un arreglo y
+        // el centro usa null para los huecos vacíos. Incluye las reglas, el centro oculto y el reloj.
+        "state": "{\"v\":1,\"game\":{...},\"roomId\":\"...\",\"timing\":{\"startsAt\":0,\"deadline\":0}}"
       }
     }
   },
 
-  // 5. MANOS PRIVADAS (Cada jugador lee ÚNICAMENTE su propia rama)
-  "hands": {
-    "{matchId}": {
-      "{uid}": [1, 1, 4, 6, 9, 11, 12]   // Ordenada de menor a mayor
-    }
+  // 5. DÓNDE ESTÁ JUGANDO CADA USUARIO (la escribe el servidor; la lee solo el dueño)
+  //    La app lo consulta al abrir para reconectarse a su sala o partida en curso.
+  "active": {
+    "{uid}": { "roomId": "{roomId}", "matchId": "{matchId}" }   // matchId solo durante una partida
   },
 
-  // 6. ESTADO COMPLETO DEL MOTOR (100% bloqueado para clientes)
-  //    Se guarda como TEXTO JSON (serializeState/deserializeState en db.ts): RTDB borra los null
-  //    del final de un arreglo, y el centro usa null para los huecos vacíos.
-  "secret": {
-    "{matchId}": {
-      "state": "{\"players\":[...],\"hands\":{...},\"center\":[5,2,null,7,7,3,8,null],...}",
-      "seed": "f48c3b7a89e1"
-    }
-  },
-
-  // 7. PARTIDA ACTIVA DE CADA JUGADOR (la escribe el servidor; la lee solo el dueño)
-  //    La app la consulta al abrir para reconectarse a una partida en curso.
-  "activeMatch": {
-    "{uid}": "{matchId}"
-  },
-
-  // 7b. PRESENCIA (onDisconnect nativo). Solo estos dos campos; las reglas rechazan cualquier otro.
+  // 6. PRESENCIA (onDisconnect nativo). Solo estos dos campos; las reglas rechazan cualquier otro.
   "presence": {
     "{uid}": {
       "online": true,
@@ -214,7 +208,7 @@ Ubicación: **`us-central1`**.
     }
   },
 
-  // 8. COLA DE EMPAREJAMIENTO RÁPIDO (índice en createdAt)
+  // 7. COLA DE EMPAREJAMIENTO RÁPIDO (índice en createdAt)
   "queue": {
     "TERNA_CLASSIC_4": {
       "{ticketId}": {
@@ -227,6 +221,8 @@ Ubicación: **`us-central1`**.
 ```
 
 **Por qué los arreglos públicos no usan `null`:** RTDB guarda los arreglos como objetos con claves numéricas y no almacena valores `null`. Un arreglo como `[5, 2, 7, null]` vuelve como `[5, 2, 7]`. Por eso `live.center` usa `true/false` y el estado del motor (con huecos `null`) se guarda como texto.
+
+**Barajado:** las partidas reales usan `crypto.randomInt` (`secureRng`). Un generador con semilla de 32 bits sería explotable: quien conozca su propia mano podría probar todas las semillas y deducir las manos de los demás. Por eso ya no se guarda ninguna `seed`.
 
 ---
 
@@ -298,7 +294,7 @@ Archivo global de partidas (auditoría y repeticiones). Lo escribe solo el servi
 |---|---|---|
 | `playerUids` | `array<string>` | UIDs de quienes jugaron. Lo usan la regla de lectura y el índice `playerUids + endedAt` |
 | `players` | `array<map>` | Igual que en el historial personal |
-| `ruleSet`, `result`, `seed`, `durationSec`, `endedAt` | — | `result = { winners, reason }`; `seed` permite reproducir la partida con el motor |
+| `ruleSet`, `result`, `seed`, `durationSec`, `endedAt` | — | `result = { winners, reason }` |
 
 ---
 
@@ -312,6 +308,27 @@ Ranking por temporadas.
 | `score` | `number` | Servidor | Puntos de clasificación / Trofeos |
 | `wins` | `number` | Servidor | Victorias en la temporada |
 | `updatedAt` | `timestamp` | Servidor | Momento del cálculo |
+
+---
+
+## 4b. API del servidor (Cloud Functions callable)
+
+El cliente **nunca escribe** salas ni partidas: solo llama a estas funciones con `Firebase.functions("us-central1")`. Todas exigen sesión; el UID sale del token, nunca de los datos enviados. Si algo falla, el error trae `details.reason` (código estable) para que la app muestre su propio mensaje en español.
+
+| Función | Datos | Devuelve | `reason` posibles |
+|---|---|---|---|
+| `createRoom` | `{ maxPlayers: 3–6, isPrivate, turnSeconds?, ruleSet?, options? }` | `{ roomId, code }` | `INVALID_MAX_PLAYERS`, `INVALID_PRIVACY`, `UNKNOWN_RULESET`, `INVALID_TURN_SECONDS`, `INVALID_OPTIONS`, `ALREADY_IN_ROOM` |
+| `joinRoom` | `{ code }` **o** `{ roomId }` (solo salas públicas) | `{ roomId }` | `INVALID_CODE`, `ROOM_NOT_FOUND`, `ROOM_PRIVATE`, `ROOM_FULL`, `ROOM_STARTED`, `BANNED`, `ALREADY_IN_ROOM` |
+| `leaveRoom` | — | `{ left }` | `ROOM_IN_MATCH` |
+| `kickPlayer` | `{ targetUid }` | — | `NOT_HOST`, `CANNOT_KICK_SELF`, `NOT_A_MEMBER`, `NOT_IN_ROOM` |
+| `startMatch` | — (usa la sala del usuario) | `{ matchId }` | `NOT_HOST`, `NOT_ENOUGH_PLAYERS`, `ROOM_STARTED`, `NOT_IN_ROOM` |
+| `gameAction` | `{ matchId, expectedSeq, action }` | `{ seq, finished }` | `NOT_YOUR_TURN`, `STALE_STATE`, `TOO_EARLY`, `GAME_OVER`, `INVALID_ACTION` y los del motor (`INVALID_SLOT`, `PASS_DISABLED`, `CLAIM_VALUE_MISMATCH`…) |
+
+`action` es uno de: `{type:"REVEAL_HAND", target, end:"LOW"|"HIGH"}`, `{type:"REVEAL_CENTER", slot}`, `{type:"CLAIM", target, value, end?}` o `{type:"PASS"}`.
+
+**`expectedSeq`** es el `live.seq` que la app tenía al tocar. Si otra jugada llegó antes, el servidor responde `STALE_STATE` y la app simplemente espera al estado nuevo (esto cubre el doble toque). **`TOO_EARLY`** protege la pausa tras un fallo: nadie juega antes de `live.turn.startsAt`, así todos alcanzan a ver las cartas.
+
+Pendiente (fase siguiente): temporizador de turno con Cloud Tasks, bots que reemplacen a quien se desconecte, y la cola de partida rápida.
 
 ---
 

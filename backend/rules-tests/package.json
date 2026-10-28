@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --config ../firebase.json --only firestore,database --project demo-terna \"vitest run\""
+    "test": "firebase emulators:exec --config ../firebase.json --only firestore,database --project demo-terna \"vitest run\"",
+    "test:functions": "firebase emulators:exec --config ../firebase.json --only firestore,database --project demo-terna \"npm --prefix ../functions run test:int\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",

@@ -16,9 +16,15 @@ import com.ternagames.terna.feature.home.SettingsRoute
 import com.ternagames.terna.feature.home.creditsScreen
 import com.ternagames.terna.feature.home.homeScreen
 import com.ternagames.terna.feature.home.settingsScreen
+import com.ternagames.terna.feature.room.CreateRoomRoute
+import com.ternagames.terna.feature.room.JoinRoomRoute
+import com.ternagames.terna.feature.room.WaitingRoomRoute
+import com.ternagames.terna.feature.room.createRoomScreen
+import com.ternagames.terna.feature.room.joinRoomScreen
+import com.ternagames.terna.feature.room.waitingRoomScreen
 
 /**
- * Splash → Login → Home (+ Ajustes y Créditos).
+ * Splash → Login → Home → (Crear | Unirse) → Sala de espera → Mesa.
  * Al entrar o salir de la sesión se limpia la pila para que "atrás" no regrese al login.
  */
 @Composable
@@ -30,11 +36,13 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
         exitTransition = { fadeOut() },
     ) {
         splashScreen(
-            onSignedIn = { navController.resetTo(HomeRoute) },
+            onSignedIn = { resumeRoomId -> navController.resetTo(resumeRoomId?.let(::WaitingRoomRoute) ?: HomeRoute) },
             onSignedOut = { navController.resetTo(LoginRoute) },
         )
         loginScreen(onSignedIn = { navController.resetTo(HomeRoute) })
         homeScreen(
+            onCreateRoom = { navController.navigate(CreateRoomRoute) { launchSingleTop = true } },
+            onJoinRoom = { navController.navigate(JoinRoomRoute) { launchSingleTop = true } },
             onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
             onOpenCredits = { navController.navigate(CreditsRoute) { launchSingleTop = true } },
             onSignedOut = { navController.resetTo(LoginRoute) },
@@ -48,7 +56,20 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
             onBack = navController::popBackStack,
             onOpenSettings = { navController.navigate(SettingsRoute) { popUpTo(HomeRoute); launchSingleTop = true } },
         )
+
+        // Salas: crear o unirse llevan a la sala de espera, y "atrás" desde ella regresa al Home.
+        createRoomScreen(onBack = navController::popBackStack, onCreated = { navController.enterWaitingRoom(it) })
+        joinRoomScreen(onBack = navController::popBackStack, onJoined = { navController.enterWaitingRoom(it) })
+        waitingRoomScreen(
+            onExit = { navController.resetTo(HomeRoute) },
+            onMatchStarted = { /* La mesa de juego se conecta en el siguiente paso. */ },
+        )
     }
+}
+
+private fun NavHostController.enterWaitingRoom(roomId: String) = navigate(WaitingRoomRoute(roomId)) {
+    popUpTo(HomeRoute)
+    launchSingleTop = true
 }
 
 private fun NavHostController.resetTo(route: Any) = navigate(route) {

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ternagames.terna.core.data.auth.AuthRepository
+import com.ternagames.terna.core.data.room.RoomRepository
 import com.ternagames.terna.core.data.user.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -21,12 +22,19 @@ data class SplashUiState(
     val destination: SplashDestination? = null,
 )
 
-enum class SplashDestination { Home, Login }
+sealed interface SplashDestination {
+    data object Home : SplashDestination
+    data object Login : SplashDestination
+
+    /** El jugador estaba en una sala (la app se cerró o perdió conexión): vuelve a ella. */
+    data class Room(val roomId: String) : SplashDestination
+}
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val users: UserRepository,
+    private val rooms: RoomRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SplashUiState())
@@ -52,7 +60,8 @@ class SplashViewModel @Inject constructor(
         _state.update { it.copy(message = "Barajando tu perfil…") }
         // Si falla (sin red, reglas sin publicar), igual se entra: el Home lo reintenta al mostrarse.
         runCatching { users.ensureProfile(session) }.onFailure { Log.w(TAG, "No se pudo sincronizar el perfil", it) }
-        return SplashDestination.Home
+        val roomId = runCatching { rooms.findActiveRoomId(session.uid) }.getOrNull()
+        return if (roomId != null) SplashDestination.Room(roomId) else SplashDestination.Home
     }
 
     private companion object {

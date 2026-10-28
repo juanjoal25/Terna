@@ -56,10 +56,12 @@ import com.ternagames.terna.core.model.Avatars
 import com.ternagames.terna.core.model.PlayerProfile
 import kotlinx.coroutines.launch
 
-private const val COMING_SOON = "Las partidas en línea se activan muy pronto. ¡Ya casi está lista la mesa!"
+private const val COMING_SOON = "La partida rápida llega muy pronto. Por ahora crea una sala o únete con un código."
 
 @Composable
 fun HomeScreen(
+    onCreateRoom: () -> Unit,
+    onJoinRoom: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCredits: () -> Unit,
     onSignedOut: () -> Unit,
@@ -75,8 +77,8 @@ fun HomeScreen(
     HomeContent(
         profile = (state as? HomeUiState.Ready)?.profile,
         snackbar = snackbar,
-        onCreateRoom = comingSoon,
-        onJoinRoom = comingSoon,
+        onCreateRoom = onCreateRoom,
+        onJoinRoom = onJoinRoom,
         onQuickPlay = comingSoon,
         onOpenSettings = onOpenSettings,
         onOpenCredits = onOpenCredits,

@@ -342,19 +342,16 @@ backend/
   ```bash
   firebase emulators:start --project dev --import=./emulator-data --export-on-exit
   ```
-- [ ] En la app, solo en debug, apunta los SDK a los emuladores. Desde el emulador de Android, tu PC es `10.0.2.2`; desde un teléfono físico, usa la IP local del PC.
-  ```kotlin
-  if (BuildConfig.USE_EMULATORS) {
-      Firebase.auth.useEmulator("10.0.2.2", 9099)
-      Firebase.database.useEmulator("10.0.2.2", 9000)
-      Firebase.firestore.useEmulator("10.0.2.2", 8080)
-      Firebase.functions.useEmulator("10.0.2.2", 5001)
-  }
+- [ ] Compila la app apuntando a los emuladores con la propiedad `useEmulators` (el flavor `dev` en debug ya permite HTTP hacia `10.0.2.2`):
+  ```bash
+  ./gradlew :app:assembleDevDebug -PuseEmulators=true
   ```
-- [ ] Permite tráfico HTTP sin cifrar **solo en debug** hacia esas IP (`network_security_config.xml` en `src/debug/`).
+  Los SDK de Auth, Realtime Database, Firestore y Functions se conectan solos a `10.0.2.2` (el computador visto desde el emulador de Android). Desde un teléfono físico hay que cambiar `emulatorHost` en `FirebaseConfig` por la IP local del PC.
+- [x] El tráfico HTTP sin cifrar está permitido **solo en debug** (`app/src/debug/AndroidManifest.xml`).
 - [ ] Las reglas de seguridad tienen pruebas en `backend/rules-tests/`: levantan los emuladores de Firestore y Realtime Database con el proyecto `demo-terna`, que no necesita iniciar sesión. Corre esto **antes de publicar cualquier cambio de reglas**, desde `backend/rules-tests`:
   ```bash
-  npm test
+  npm test              # reglas de seguridad
+  npm run test:functions  # salas y partidas contra los emuladores
   ```
 
 ---

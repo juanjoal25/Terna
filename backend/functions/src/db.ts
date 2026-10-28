@@ -1,51 +1,28 @@
-import { initializeApp, getApps } from "firebase-admin/app";
+import { getApps, initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { getFirestore } from "firebase-admin/firestore";
-import type { GameState } from "./engine/index.js";
-
-// Inicialización singleton de Firebase Admin SDK
-export const app = getApps().length === 0 ? initializeApp() : getApps()[0]!;
-export const rtdb = getDatabase(app);
-export const firestore = getFirestore(app);
+import { secureRng } from "./engine/index.js";
+import { firestoreArchive, firestoreProfiles } from "./match/archive.js";
+import type { Deps } from "./rooms/types.js";
 
 /**
- * Referencias de Realtime Database.
- * Evitan errores tipográficos en las rutas (ver docs/ESQUEMA_BASE_DATOS_FIREBASE.md §3).
+ * Dependencias reales (Realtime Database, Firestore y barajado criptográfico).
+ * Se crean la primera vez que alguien las pide, no al cargar el módulo: así el análisis de
+ * despliegue de Firebase no necesita credenciales.
  */
-export const rtdbRefs = {
-  rooms: () => rtdb.ref("rooms"),
-  room: (roomId: string) => rtdb.ref(`rooms/${roomId}`),
-  openRooms: () => rtdb.ref("openRooms"),
-  openRoom: (roomId: string) => rtdb.ref(`openRooms/${roomId}`),
-  roomCodes: () => rtdb.ref("roomCodes"),
-  roomCode: (code: string) => rtdb.ref(`roomCodes/${code}`),
-  matches: () => rtdb.ref("matches"),
-  match: (matchId: string) => rtdb.ref(`matches/${matchId}`),
-  matchLive: (matchId: string) => rtdb.ref(`matches/${matchId}/live`),
-  matchPlayers: (matchId: string) => rtdb.ref(`matches/${matchId}/players`),
-  hands: (matchId: string) => rtdb.ref(`hands/${matchId}`),
-  hand: (matchId: string, uid: string) => rtdb.ref(`hands/${matchId}/${uid}`),
-  secret: (matchId: string) => rtdb.ref(`secret/${matchId}`),
-  activeMatch: (uid: string) => rtdb.ref(`activeMatch/${uid}`),
-  presence: (uid: string) => rtdb.ref(`presence/${uid}`),
-  queue: (queueKey: string) => rtdb.ref(`queue/${queueKey}`),
-};
+let deps: Deps | undefined;
 
-/**
- * El estado completo del motor se guarda como texto JSON en `secret/{matchId}/state`.
- * RTDB borra los `null` del final de un arreglo (el centro usa `null` para huecos vacíos),
- * así que guardarlo como árbol cambiaría el tamaño de la mesa al leerlo.
- */
-export const serializeState = (state: GameState): string => JSON.stringify(state);
-export const deserializeState = (raw: string): GameState => JSON.parse(raw) as GameState;
-
-/**
- * Referencias de Cloud Firestore.
- */
-export const firestoreCols = {
-  users: () => firestore.collection("users"),
-  user: (uid: string) => firestore.doc(`users/${uid}`),
-  userMatchHistory: (uid: string) => firestore.collection(`users/${uid}/matchHistory`),
-  matchArchive: () => firestore.collection("matchArchive"),
-  leaderboards: (season: string) => firestore.collection(`leaderboards/${season}/entries`),
-};
+export function getDeps(): Deps {
+  if (!deps) {
+    const app = getApps()[0] ?? initializeApp();
+    const firestore = getFirestore(app);
+    deps = {
+      db: getDatabase(app),
+      getProfile: firestoreProfiles(firestore),
+      archive: firestoreArchive(firestore),
+      now: Date.now,
+      rng: secureRng(),
+    };
+  }
+  return deps;
+}

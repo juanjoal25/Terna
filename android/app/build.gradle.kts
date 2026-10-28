@@ -18,8 +18,8 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // Cambiar a true para apuntar a los emuladores locales de Firebase (ver docs/FIREBASE_SETUP.md §15).
-        buildConfigField("boolean", "USE_EMULATORS", "false")
+        // Para apuntar a los emuladores locales de Firebase: ./gradlew -PuseEmulators=true (ver docs/FIREBASE_SETUP.md §15).
+        buildConfigField("boolean", "USE_EMULATORS", providers.gradleProperty("useEmulators").getOrElse("false"))
     }
 
     // Cada entorno usa su propio proyecto de Firebase y su google-services.json:
@@ -80,6 +80,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:home"))
+    implementation(project(":feature:room"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

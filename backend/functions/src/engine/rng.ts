@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 /** Generador aleatorio inyectable: devuelve un número en [0, 1). */
 export type Rng = () => number;
 
@@ -15,6 +17,16 @@ export function seededRng(seed: number): Rng {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * Generador para partidas reales: usa el generador criptográfico del sistema.
+ *
+ * Nunca se debe barajar con `seededRng` en producción: su estado interno son solo 32 bits, y
+ * quien conozca su propia mano podría probar todas las semillas y deducir las manos de los demás.
+ */
+export function secureRng(): Rng {
+  return () => randomInt(0, 2 ** 48) / 2 ** 48;
 }
 
 /** Fisher–Yates sobre una copia del arreglo. */

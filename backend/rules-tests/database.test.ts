@@ -17,16 +17,22 @@ beforeEach(async () => {
   await env.clearDatabase();
   await env.withSecurityRulesDisabled(async (ctx) => {
     await set(ref(ctx.database()), {
-      matches: { m1: { players: { ana: { seat: 0 }, beto: { seat: 1 } }, live: { seq: 1 } } },
-      hands: { m1: { ana: [1, 4, 9], beto: [2, 2, 12] } },
-      secret: { m1: { state: "{}" } },
+      matches: {
+        m1: {
+          meta: { status: "PLAYING" },
+          players: { ana: { seat: 0 }, beto: { seat: 1 } },
+          live: { seq: 1 },
+          hands: { ana: [1, 4, 9], beto: [2, 2, 12] },
+          secret: { state: "{}" },
+        },
+      },
       rooms: {
         pub: { type: "PUBLIC", members: { ana: { name: "Ana" } } },
         priv: { type: "PRIVATE", members: { ana: { name: "Ana" } } },
       },
       openRooms: { pub: { name: "Sala de Ana", players: 1 } },
       roomCodes: { "TRN-7K4Q": "priv" },
-      activeMatch: { ana: "m1" },
+      active: { ana: { roomId: "pub", matchId: "m1" } },
     });
   });
 });
@@ -35,33 +41,45 @@ const db = (uid: string) => env.authenticatedContext(uid).database();
 const anon = () => env.unauthenticatedContext().database();
 
 describe("partidas", () => {
-  it("solo los jugadores de la partida la leen", async () => {
-    await assertSucceeds(get(ref(db("ana"), "matches/m1")));
-    await assertFails(get(ref(db("carla"), "matches/m1")));
-    await assertFails(get(ref(anon(), "matches/m1")));
+  it("solo los jugadores de la partida leen lo público", async () => {
+    for (const branch of ["meta", "players", "live"]) {
+      await assertSucceeds(get(ref(db("ana"), `matches/m1/${branch}`)));
+      await assertSucceeds(get(ref(db("beto"), `matches/m1/${branch}`)));
+      await assertFails(get(ref(db("carla"), `matches/m1/${branch}`)));
+      await assertFails(get(ref(anon(), `matches/m1/${branch}`)));
+    }
+  });
+
+  it("nadie lee la partida completa: tendría las manos y el estado secreto", async () => {
+    await assertFails(get(ref(db("ana"), "matches/m1")));
+    await assertFails(get(ref(db("ana"), "matches")));
   });
 
   it("cada jugador ve solo su propia mano", async () => {
-    await assertSucceeds(get(ref(db("ana"), "hands/m1/ana")));
-    await assertFails(get(ref(db("ana"), "hands/m1/beto")));
-    await assertFails(get(ref(db("ana"), "hands/m1")));
+    await assertSucceeds(get(ref(db("ana"), "matches/m1/hands/ana")));
+    await assertFails(get(ref(db("ana"), "matches/m1/hands/beto")));
+    await assertFails(get(ref(db("ana"), "matches/m1/hands")));
+    await assertFails(get(ref(db("carla"), "matches/m1/hands/ana")));
   });
 
   it("nadie lee el estado secreto ni los códigos de sala", async () => {
-    await assertFails(get(ref(db("ana"), "secret/m1")));
+    await assertFails(get(ref(db("ana"), "matches/m1/secret")));
+    await assertFails(get(ref(db("ana"), "matches/m1/secret/state")));
     await assertFails(get(ref(db("ana"), "roomCodes")));
   });
 
   it("ningún cliente escribe partidas, manos ni salas", async () => {
     await assertFails(update(ref(db("ana"), "matches/m1/live"), { seq: 99 }));
-    await assertFails(set(ref(db("ana"), "hands/m1/ana"), [7, 7, 7]));
+    await assertFails(set(ref(db("ana"), "matches/m1/hands/ana"), [7, 7, 7]));
+    await assertFails(set(ref(db("ana"), "matches/m1/secret/state"), "{}"));
     await assertFails(set(ref(db("ana"), "rooms/pub/members/ana/name"), "Hack"));
     await assertFails(set(ref(db("ana"), "openRooms/nueva"), { name: "spam" }));
   });
 
-  it("activeMatch lo lee solo su dueño", async () => {
-    await assertSucceeds(get(ref(db("ana"), "activeMatch/ana")));
-    await assertFails(get(ref(db("beto"), "activeMatch/ana")));
+  it("`active` lo lee solo su dueño y no lo escribe nadie", async () => {
+    await assertSucceeds(get(ref(db("ana"), "active/ana")));
+    await assertFails(get(ref(db("beto"), "active/ana")));
+    await assertFails(set(ref(db("ana"), "active/ana"), { roomId: "otra" }));
   });
 });
 
