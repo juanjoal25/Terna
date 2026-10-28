@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.TernaBackdrop
 import com.ternagames.terna.core.designsystem.component.TernaBackground
 import com.ternagames.terna.core.designsystem.component.TernaRoundIconButton
@@ -42,6 +44,7 @@ internal fun SubScreenScaffold(
     snackbar: SnackbarHostState? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val audio = rememberTernaAudio()
     TernaBackground(TernaBackdrop.Home) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -55,7 +58,14 @@ internal fun SubScreenScaffold(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .clickable(role = Role.Button, onClickLabel = "Volver", onClick = onBack)
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Volver",
+                            onClick = {
+                                audio.play(TernaSfx.UiClick)
+                                onBack()
+                            },
+                        )
                         .padding(8.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = TernaColors.White)
@@ -74,9 +84,9 @@ internal fun SubScreenScaffold(
                 }
             }
             if (title != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(title, style = MaterialTheme.typography.displayLarge.copy(fontSize = 38.sp), color = TernaColors.White)
                 Spacer(Modifier.height(8.dp))
-                Text(title, style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp), color = TernaColors.White)
-                Spacer(Modifier.height(12.dp))
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

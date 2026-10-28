@@ -3,9 +3,14 @@ package com.ternagames.terna.navigation
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.feature.auth.LoginRoute
 import com.ternagames.terna.feature.auth.SplashRoute
 import com.ternagames.terna.feature.auth.loginScreen
@@ -33,6 +38,16 @@ import com.ternagames.terna.feature.room.waitingRoomScreen
  */
 @Composable
 fun TernaNavHost(navController: NavHostController = rememberNavController()) {
+    val audio = rememberTernaAudio()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val destination = backStackEntry?.destination
+
+    // Música de fondo activa desde que se ingresa a la app, excepto en la partida (GameRoute).
+    LaunchedEffect(destination) {
+        val inMenuOrLobby = destination != null && !destination.hasRoute<GameRoute>()
+        audio.setMenuMusicActive(inMenuOrLobby)
+    }
+
     NavHost(
         navController = navController,
         startDestination = SplashRoute,

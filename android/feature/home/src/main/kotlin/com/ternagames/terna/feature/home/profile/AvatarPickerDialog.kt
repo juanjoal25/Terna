@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.PlayerAvatar
 import com.ternagames.terna.core.designsystem.component.TernaAvatars
 import com.ternagames.terna.core.designsystem.component.TernaPanel
@@ -56,6 +58,7 @@ internal fun AvatarPickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
+    val audio = rememberTernaAudio()
     // La foto de Google solo se ofrece a quien la tiene.
     val options = buildList {
         if (photoUrl != null) add(Avatars.PHOTO to "Mi foto")
@@ -67,7 +70,13 @@ internal fun AvatarPickerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         TernaPanel(Modifier.widthIn(max = 520.dp).padding(16.dp), contentPadding = 16.dp) {
             Box(Modifier.fillMaxWidth()) {
-                IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).size(32.dp)) {
+                IconButton(
+                    onClick = {
+                        audio.play(TernaSfx.UiClick)
+                        onDismiss()
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                ) {
                     Icon(Icons.Rounded.Close, contentDescription = "Cerrar", tint = TernaColors.TextMuted)
                 }
                 Column(
@@ -84,7 +93,16 @@ internal fun AvatarPickerDialog(
                     options.chunked(COLUMNS).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             row.forEach { (id, name) ->
-                                AvatarChoice(id, name, photoUrl, selected = id == selected, onClick = { selected = id })
+                                AvatarChoice(
+                                    id = id,
+                                    name = name,
+                                    photoUrl = photoUrl,
+                                    selected = id == selected,
+                                    onClick = {
+                                        audio.play(TernaSfx.UiClick)
+                                        selected = id
+                                    },
+                                )
                             }
                         }
                     }

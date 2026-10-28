@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 
 /** Botón oscuro con borde amarillo ("ABANDONAR", "CANCELAR", "BUSCAR"). */
@@ -54,6 +56,7 @@ fun TernaOutlineButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
 ) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(12.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -64,7 +67,14 @@ fun TernaOutlineButton(
             .clip(shape)
             .background(TernaColors.Field.copy(alpha = 0.85f))
             .border(1.5.dp, TernaColors.Yellow, shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         if (icon != null) {
@@ -84,6 +94,7 @@ fun TernaSquareIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(12.dp)
     Box(
         contentAlignment = Alignment.Center,
@@ -93,7 +104,14 @@ fun TernaSquareIconButton(
             .clip(shape)
             .background(TernaColors.Field.copy(alpha = 0.6f))
             .border(1.5.dp, TernaColors.Yellow, shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .semantics { contentDescription = description },
     ) {
         Icon(icon, contentDescription = null, tint = TernaColors.Yellow, modifier = Modifier.size(26.dp))
@@ -103,6 +121,7 @@ fun TernaSquareIconButton(
 /** Interruptor amarillo del diseño (apagado: pista oscura; encendido: pista amarilla). */
 @Composable
 fun TernaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val audio = rememberTernaAudio()
     val track by animateColorAsState(if (checked) TernaColors.Yellow else TernaColors.PanelVariant, label = "switch-track")
     val knob by animateColorAsState(if (checked) TernaColors.OnYellow else Color(0xFF9A918A), label = "switch-knob")
     val offset by animateDpAsState(if (checked) 28.dp else 0.dp, label = "switch-offset")
@@ -112,7 +131,10 @@ fun TernaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: 
             .height(30.dp)
             .clip(CircleShape)
             .background(track)
-            .clickable(role = Role.Switch) { onCheckedChange(!checked) }
+            .clickable(role = Role.Switch) {
+                audio.play(TernaSfx.UiClick)
+                onCheckedChange(!checked)
+            }
             .padding(3.dp),
     ) {
         Box(

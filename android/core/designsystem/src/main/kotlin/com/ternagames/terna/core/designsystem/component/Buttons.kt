@@ -39,6 +39,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 
 /**
@@ -56,6 +58,7 @@ fun TernaChunkyButton(
     loading: Boolean = false,
     body: @Composable () -> Unit,
 ) {
+    val audio = rememberTernaAudio()
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val depth = 4.dp
@@ -72,7 +75,10 @@ fun TernaChunkyButton(
                 indication = null,
                 enabled = enabled && !loading,
                 role = Role.Button,
-                onClick = onClick,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
             ),
     ) {
         Box(
@@ -152,9 +158,17 @@ fun TernaRoundIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val audio = rememberTernaAudio()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
+        modifier = modifier.clickable(
+            role = Role.Button,
+            onClickLabel = label,
+            onClick = {
+                audio.play(TernaSfx.UiClick)
+                onClick()
+            },
+        ),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -173,11 +187,19 @@ fun TernaRoundIconButton(
 /** "← VOLVER" de las pantallas secundarias. */
 @Composable
 fun TernaBackButton(onClick: () -> Unit, modifier: Modifier = Modifier, text: String = "VOLVER") {
+    val audio = rememberTernaAudio()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .clickable(role = Role.Button, onClickLabel = text, onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = text,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .padding(horizontal = 8.dp, vertical = 8.dp),
     ) {
         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = TernaColors.White)
@@ -198,6 +220,7 @@ fun TernaCompactButton(
     enabled: Boolean = true,
     loading: Boolean = false,
 ) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(10.dp)
     Box(
         contentAlignment = Alignment.Center,
@@ -205,7 +228,14 @@ fun TernaCompactButton(
             .defaultMinSize(minHeight = 34.dp)
             .clip(shape)
             .background(if (enabled) TernaColors.Yellow else Color(0x33FFFFFF))
-            .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
+            .clickable(
+                enabled = enabled && !loading,
+                role = Role.Button,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         if (loading) {

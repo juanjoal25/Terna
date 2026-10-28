@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ternagames.terna.core.designsystem.R as DesignR
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.TernaBackButton
 import com.ternagames.terna.core.designsystem.component.TernaBackdrop
 import com.ternagames.terna.core.designsystem.component.TernaBackground
@@ -60,9 +62,15 @@ fun CreateRoomScreen(
     viewModel: CreateRoomViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val audio = rememberTernaAudio()
     val snackbar = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.enterRoomId) { state.enterRoomId?.let(onCreated) }
+    LaunchedEffect(state.enterRoomId) {
+        state.enterRoomId?.let { roomId ->
+            audio.play(TernaSfx.RoomJoin)
+            onCreated(roomId)
+        }
+    }
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbar.showSnackbar(it)

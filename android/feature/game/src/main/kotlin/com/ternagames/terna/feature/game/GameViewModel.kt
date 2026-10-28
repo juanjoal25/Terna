@@ -10,6 +10,7 @@ import com.ternagames.terna.core.data.auth.AuthRepository
 import com.ternagames.terna.core.data.match.MatchRepository
 import com.ternagames.terna.core.data.room.RoomRepository
 import com.ternagames.terna.core.data.userMessage
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
 import com.ternagames.terna.core.model.GameAction
 import com.ternagames.terna.core.model.HandEnd
 import com.ternagames.terna.core.model.MatchEvent
@@ -62,6 +63,7 @@ data class GameUiState(
     val dialog: GameDialog? = null,
     val selectingCenter: Boolean = false,
     val banner: Banner? = null,
+    val soundEffect: Pair<Long, TernaSfx>? = null,
     val message: String? = null,
     val exit: GameExit? = null,
     /** La partida no existe o ya no se puede ver. */
@@ -87,6 +89,7 @@ class GameViewModel @Inject constructor(
     private var serverOffset = 0L
     private var lastSeenSeq = -1L
     private var bannerCounter = 0L
+    private var sfxCounter = 0L
     private var reportedTimeoutSeq = -1L
 
     init {
@@ -119,8 +122,11 @@ class GameViewModel @Inject constructor(
             return
         }
         val firstLoad = lastSeenSeq < 0
+        val wasFinished = _state.value.match?.finished == true
         val fresh = if (firstLoad) emptyList() else match.events.filter { it.seq > lastSeenSeq }
         lastSeenSeq = match.seq
+        val sfx = if (firstLoad) null else sfxFor(fresh, match, myUid, justFinished = !wasFinished && match.finished)
+
         // Si el turno cambió, se cierra lo que el jugador tuviera a medias.
         _state.update { s ->
             val turnChanged = s.match?.turn?.let { it.player != match.turn.player || it.number != match.turn.number } ?: false
@@ -129,6 +135,7 @@ class GameViewModel @Inject constructor(
                 busy = false,
                 dialog = if (turnChanged || match.finished) null else s.dialog,
                 selectingCenter = if (turnChanged || match.finished) false else s.selectingCenter,
+                soundEffect = sfx?.let { (++sfxCounter) to it } ?: s.soundEffect,
             )
         }
         bannerFor(fresh, match)?.let(::showBanner)
@@ -281,14 +288,60 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val TAG = "Game"
-        const val TICK_MS = 250L
-        const val BANNER_MS = 3_200L
-        const val LUCKY_NUMBER = 7
-        const val TIMEOUT_GRACE_MS = 1_000L
-        const val TIMEOUT_STAGGER_MS = 700L
-        const val RETRY_TIMEOUT_MS = 3_000L
-        const val BUSY_SAFETY_MS = 6_000L
+    companion object {
+        private const val TAG = "Game"
+        private const val TICK_MS = 250L
+        private const val BANNER_MS = 3_200L
+        private const val LUCKY_NUMBER = 7
+        private const val TIMEOUT_GRACE_MS = 1_000L
+        private const val TIMEOUT_STAGGER_MS = 700L
+        private const val RETRY_TIMEOUT_MS = 3_000L
+        private const val BUSY_SAFETY_MS = 6_000L
+
+        /**
+         * Elige el efecto de sonido más representativo de los eventos nuevos de la jugada:
+         * - Fin de partida: Victoria Jackpot 777 (`INSTANT`), Victoria Normal (3 Ternas / `SETS`), o fallo si perdió.
+         * - Terna completada: `TernaComplete`.
+         * - Error al pedir carta (`-1000 de aura`): `AuraLoss`.
+         * - Fallo de coincidencia o tiempo agotado: `TurnFail`.
+         * - Carta revelada: `CardMatch` si es acierto al pedir o segunda carta igual; `CardFlip` al destapar la primera.
+         */
+        internal fun sfxFor(
+            events: List<MatchEvent>,
+            match: MatchState,
+            myUid: String,
+            justFinished: Boolean = false,
+        ): TernaSfx? {
+            val gameOverResult = events.filterIsInstance<MatchEvent.GameOver>().lastOrNull()?.result
+                ?: if (justFinished) match.result else null
+            if (gameOverResult != null) {
+                return when {
+                    myUid in gameOverResult.winners && gameOverResult.reason == "INSTANT" -> TernaSfx.VictoryJackpot
+                    myUid in gameOverResult.winners -> TernaSfx.VictoryNormal
+                    else -> TernaSfx.TurnFail
+                }
+            }
+            if (events.any { it is MatchEvent.SetCompleted }) {
+                return TernaSfx.TernaComplete
+            }
+            if (events.any { it is MatchEvent.ClaimFailed }) {
+                return TernaSfx.AuraLoss
+            }
+            if (events.any { it is MatchEvent.TurnFailed || it is MatchEvent.TurnTimeout }) {
+                return TernaSfx.TurnFail
+            }
+            val revealed = events.filterIsInstance<MatchEvent.CardRevealed>().lastOrNull()
+            if (revealed != null) {
+                return if (revealed.card.claimed || match.revealed.size >= 2) {
+                    TernaSfx.CardMatch
+                } else {
+                    TernaSfx.CardFlip
+                }
+            }
+            if (events.any { it is MatchEvent.TurnPassed }) {
+                return TernaSfx.CardFlip
+            }
+            return null
+        }
     }
 }

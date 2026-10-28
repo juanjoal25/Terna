@@ -1,5 +1,6 @@
 package com.ternagames.terna.feature.game
 
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
 import com.ternagames.terna.core.model.GameResult
 import com.ternagames.terna.core.model.HandEnd
 import com.ternagames.terna.core.model.MatchEvent
@@ -131,5 +132,36 @@ class GameLogicTest {
     fun `el resultado de la partida se puede leer del modelo`() {
         val r = GameResult(listOf("ana"), "INSTANT")
         assertEquals("INSTANT", r.reason)
+    }
+
+    @Test
+    fun `efectos de sonido distinguen victoria normal por 3 ternas y victoria jackpot 777`() {
+        val m = match()
+        val winNormal = listOf(
+            MatchEvent.SetCompleted(6, "ana", 4, emptyList()),
+            MatchEvent.GameOver(7, GameResult(listOf("ana"), "SETS")),
+        )
+        assertEquals(TernaSfx.VictoryNormal, GameViewModel.sfxFor(winNormal, m, "ana"))
+
+        val winJackpot = listOf(
+            MatchEvent.SetCompleted(6, "ana", 7, emptyList()),
+            MatchEvent.GameOver(7, GameResult(listOf("ana"), "INSTANT")),
+        )
+        assertEquals(TernaSfx.VictoryJackpot, GameViewModel.sfxFor(winJackpot, m, "ana"))
+
+        val ternaOnly = listOf(MatchEvent.SetCompleted(6, "ana", 4, emptyList()))
+        assertEquals(TernaSfx.TernaComplete, GameViewModel.sfxFor(ternaOnly, m, "ana"))
+
+        val claimFail = listOf(MatchEvent.ClaimFailed(6, "ana", "beto", 5))
+        assertEquals(TernaSfx.AuraLoss, GameViewModel.sfxFor(claimFail, m, "ana"))
+
+        val firstFlip = listOf(MatchEvent.CardRevealed(6, "ana", fromCenter(0, 3)))
+        assertEquals(TernaSfx.CardFlip, GameViewModel.sfxFor(firstFlip, match(revealed = listOf(fromCenter(0, 3))), "ana"))
+
+        val secondMatch = listOf(MatchEvent.CardRevealed(7, "ana", fromHand("beto", HandEnd.Low, 3)))
+        assertEquals(
+            TernaSfx.CardMatch,
+            GameViewModel.sfxFor(secondMatch, match(revealed = listOf(fromCenter(0, 3), fromHand("beto", HandEnd.Low, 3))), "ana"),
+        )
     }
 }

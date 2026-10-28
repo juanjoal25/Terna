@@ -21,12 +21,11 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -42,8 +41,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +65,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ternagames.terna.core.designsystem.R as DesignR
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.DialogTitle
 import com.ternagames.terna.core.designsystem.component.TernaBackdrop
 import com.ternagames.terna.core.designsystem.component.TernaBackground
@@ -87,17 +91,47 @@ fun WaitingRoomScreen(
     viewModel: WaitingRoomViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val audio = rememberTernaAudio()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var prevMemberCount by remember { mutableIntStateOf(-1) }
+    var startSoundPlayed by remember { mutableStateOf(false) }
 
     BackHandler(enabled = state.exit == null) { viewModel.leave() }
+
+    // Sonido cálido cuando otro jugador se une a la sala de espera.
+    val memberCount = state.room?.members?.size ?: -1
+    LaunchedEffect(memberCount) {
+        if (memberCount > 0) {
+            if (prevMemberCount in 1 until memberCount) {
+                audio.play(TernaSfx.RoomJoin)
+            }
+            prevMemberCount = memberCount
+        }
+    }
+
+    // Sonido festivo al iniciar la partida.
+    LaunchedEffect(state.starting) {
+        if (state.starting && !startSoundPlayed) {
+            startSoundPlayed = true
+            audio.play(TernaSfx.MatchStart)
+        }
+    }
 
     LaunchedEffect(state.exit) {
         val exit = state.exit ?: return@LaunchedEffect
         exit.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
         onExit()
     }
-    LaunchedEffect(state.matchId) { state.matchId?.let(onMatchStarted) }
+    LaunchedEffect(state.matchId) {
+        state.matchId?.let { matchId ->
+            if (!startSoundPlayed) {
+                startSoundPlayed = true
+                audio.play(TernaSfx.MatchStart)
+            }
+            onMatchStarted(matchId)
+        }
+    }
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbar.showSnackbar(it)
@@ -211,6 +245,7 @@ private fun PrivacyBadge(isPrivate: Boolean) {
 
 @Composable
 private fun CodeChip(code: String, modifier: Modifier = Modifier) {
+    val audio = rememberTernaAudio()
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -223,6 +258,7 @@ private fun CodeChip(code: String, modifier: Modifier = Modifier) {
                 .background(TernaColors.Field.copy(alpha = 0.85f))
                 .border(1.5.dp, TernaColors.Yellow, shape)
                 .clickable(onClickLabel = "Copiar código") {
+                    audio.play(TernaSfx.UiClick)
                     scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Código de sala", code))) }
                     Toast.makeText(context, "Código copiado", Toast.LENGTH_SHORT).show()
                 }
@@ -286,6 +322,7 @@ private fun PlayersPanel(room: Room, state: WaitingRoomUiState, onKick: (String)
 
 @Composable
 private fun PlayerSlot(member: RoomMember?, isYou: Boolean, canKick: Boolean, onKick: () -> Unit) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(10.dp)
     val occupied = member != null
     Row(
@@ -336,7 +373,13 @@ private fun PlayerSlot(member: RoomMember?, isYou: Boolean, canKick: Boolean, on
                     .size(24.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(TernaColors.Danger)
-                    .clickable(onClickLabel = "Sacar a ${member?.name}", onClick = onKick),
+                    .clickable(
+                        onClickLabel = "Sacar a ${member?.name}",
+                        onClick = {
+                            audio.play(TernaSfx.UiClick)
+                            onKick()
+                        },
+                    ),
             ) {
                 Icon(Icons.Rounded.Close, contentDescription = null, tint = TernaColors.White, modifier = Modifier.size(14.dp))
             }

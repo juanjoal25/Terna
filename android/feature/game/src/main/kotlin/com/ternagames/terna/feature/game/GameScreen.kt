@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.CARD_ASPECT_RATIO
 import com.ternagames.terna.core.designsystem.component.PlayerAvatar
 import com.ternagames.terna.core.designsystem.component.PlayingCard
@@ -93,12 +94,17 @@ fun GameScreen(
     viewModel: GameViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val audio = rememberTernaAudio()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
 
     // Durante la partida, "atrás" no la abandona por accidente.
     BackHandler(enabled = state.match?.finished != true) {
         Toast.makeText(context, "Termina la partida para salir.", Toast.LENGTH_SHORT).show()
+    }
+
+    LaunchedEffect(state.soundEffect?.first) {
+        state.soundEffect?.second?.let(audio::play)
     }
 
     LaunchedEffect(state.exit) {

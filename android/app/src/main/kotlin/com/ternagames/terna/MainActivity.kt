@@ -8,6 +8,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.ternagames.terna.core.designsystem.audio.TernaAudio
 import com.ternagames.terna.core.designsystem.theme.TernaTheme
 import com.ternagames.terna.navigation.TernaNavHost
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,6 +23,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             TernaTheme { TernaNavHost() }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        TernaAudio.get(this).setAppForeground(true)
+    }
+
+    override fun onStop() {
+        TernaAudio.get(this).setAppForeground(false)
+        super.onStop()
     }
 
     /** Pantalla completa de juego: las barras aparecen deslizando desde el borde. */

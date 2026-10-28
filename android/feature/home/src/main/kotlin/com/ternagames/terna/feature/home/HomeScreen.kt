@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ternagames.terna.core.designsystem.R as DesignR
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.PlayerAvatar
 import com.ternagames.terna.core.designsystem.component.TernaBackdrop
 import com.ternagames.terna.core.designsystem.component.TernaBackground
@@ -150,13 +152,21 @@ internal fun HomeContent(
 
 @Composable
 private fun PlayerChip(profile: PlayerProfile?, photoUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(14.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .width(220.dp)
             .clip(shape)
-            .clickable(role = Role.Button, onClickLabel = "Ver perfil", onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = "Ver perfil",
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .background(TernaColors.Panel)
             .border(1.5.dp, TernaColors.Yellow, shape)
             .padding(6.dp),

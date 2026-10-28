@@ -31,6 +31,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ternagames.terna.core.designsystem.R as DesignR
+import com.ternagames.terna.core.designsystem.audio.TernaSfx
+import com.ternagames.terna.core.designsystem.audio.rememberTernaAudio
 import com.ternagames.terna.core.designsystem.component.DialogTitle
 import com.ternagames.terna.core.designsystem.component.PlayerAvatar
 import com.ternagames.terna.core.designsystem.component.TernaDialog
@@ -134,19 +136,30 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
 
 @Composable
 private fun Header(title: String, onClose: () -> Unit) {
+    val audio = rememberTernaAudio()
     Box(Modifier.fillMaxWidth()) {
         DialogTitle(title, Modifier.padding(horizontal = 24.dp))
         Icon(
             Icons.Rounded.Close,
             contentDescription = "Cerrar",
             tint = TernaColors.TextMuted,
-            modifier = Modifier.align(Alignment.TopEnd).size(22.dp).clickable(role = Role.Button, onClick = onClose),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(22.dp)
+                .clickable(
+                    role = Role.Button,
+                    onClick = {
+                        audio.play(TernaSfx.UiClick)
+                        onClose()
+                    },
+                ),
         )
     }
 }
 
 @Composable
 private fun PlayerChoice(avatar: String, label: String, onClick: () -> Unit) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(12.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -155,7 +168,13 @@ private fun PlayerChoice(avatar: String, label: String, onClick: () -> Unit) {
             .clip(shape)
             .background(TernaColors.PanelVariant)
             .border(1.dp, TernaColors.Yellow.copy(alpha = 0.6f), shape)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            )
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         PlayerAvatar(avatar, 26.dp)
@@ -166,6 +185,7 @@ private fun PlayerChoice(avatar: String, label: String, onClick: () -> Unit) {
 
 @Composable
 private fun NumberChip(number: Int, onClick: () -> Unit) {
+    val audio = rememberTernaAudio()
     val shape = RoundedCornerShape(10.dp)
     Box(
         contentAlignment = Alignment.Center,
@@ -173,7 +193,14 @@ private fun NumberChip(number: Int, onClick: () -> Unit) {
             .size(44.dp)
             .clip(shape)
             .background(TernaColors.Yellow)
-            .clickable(role = Role.Button, onClickLabel = "Pedir el $number", onClick = onClick),
+            .clickable(
+                role = Role.Button,
+                onClickLabel = "Pedir el $number",
+                onClick = {
+                    audio.play(TernaSfx.UiClick)
+                    onClick()
+                },
+            ),
     ) {
         Text("$number", style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp), color = TernaColors.OnYellow)
     }
