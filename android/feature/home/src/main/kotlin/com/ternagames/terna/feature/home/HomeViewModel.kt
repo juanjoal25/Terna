@@ -21,7 +21,7 @@ import javax.inject.Inject
 sealed interface HomeUiState {
     data object Loading : HomeUiState
     data object SignedOut : HomeUiState
-    data class Ready(val profile: PlayerProfile?) : HomeUiState
+    data class Ready(val profile: PlayerProfile?, val photoUrl: String? = null) : HomeUiState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -39,10 +39,10 @@ class HomeViewModel @Inject constructor(
                 users.observeProfile(session.uid)
                     // Si el splash no pudo crear el perfil (p. ej. sin red), se reintenta aquí.
                     .onStart { runCatching { users.ensureProfile(session) } }
-                    .map<PlayerProfile?, HomeUiState> { HomeUiState.Ready(it) }
+                    .map<PlayerProfile?, HomeUiState> { HomeUiState.Ready(it, session.photoUrl) }
                     .catch {
                         Log.w("Home", "No se pudo leer el perfil", it)
-                        emit(HomeUiState.Ready(null))
+                        emit(HomeUiState.Ready(null, session.photoUrl))
                     }
             }
         }

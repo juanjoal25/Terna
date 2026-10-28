@@ -12,13 +12,15 @@ import com.ternagames.terna.feature.auth.loginScreen
 import com.ternagames.terna.feature.auth.splashScreen
 import com.ternagames.terna.feature.home.CreditsRoute
 import com.ternagames.terna.feature.home.HomeRoute
+import com.ternagames.terna.feature.home.ProfileRoute
 import com.ternagames.terna.feature.home.SettingsRoute
 import com.ternagames.terna.feature.home.creditsScreen
 import com.ternagames.terna.feature.home.homeScreen
+import com.ternagames.terna.feature.home.profileScreen
 import com.ternagames.terna.feature.home.settingsScreen
 
 /**
- * Splash → Login → Home (+ Ajustes y Créditos).
+ * Splash → Login → Home (+ Perfil, Ajustes y Créditos).
  * Al entrar o salir de la sesión se limpia la pila para que "atrás" no regrese al login.
  */
 @Composable
@@ -35,8 +37,15 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
         )
         loginScreen(onSignedIn = { navController.resetTo(HomeRoute) })
         homeScreen(
+            onOpenProfile = { navController.navigate(ProfileRoute) { launchSingleTop = true } },
             onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
             onOpenCredits = { navController.navigate(CreditsRoute) { launchSingleTop = true } },
+            onSignedOut = { navController.resetTo(LoginRoute) },
+        )
+        profileScreen(
+            onBack = navController::popBackStack,
+            onOpenSettings = { navController.navigate(SettingsRoute) { popUpTo(HomeRoute); launchSingleTop = true } },
+            onOpenCredits = { navController.navigate(CreditsRoute) { popUpTo(HomeRoute); launchSingleTop = true } },
             onSignedOut = { navController.resetTo(LoginRoute) },
         )
         settingsScreen(

@@ -571,6 +571,6 @@ Considera **Play Asset Delivery** si en el futuro añades muchas mesas o cartas 
 8. **"Ingresar código" (modal) vs. campo de código** en "Unirse a sala": hay dos entradas para lo mismo. ¿Cuándo aparece el modal?
 9. ~~Reglas del turno~~ → configurables (§1.1.1). Falta decidir los **valores por defecto** de cada sala y si el anfitrión puede cambiarlos desde "Crear sala".
 10. **"Cerrar sesión" del invitado** borra para siempre su cuenta anónima y su progreso. En "Ajustes invitado" conviene cambiarlo por "Vincular cuenta (Google / Facebook)" y advertir antes de salir.
-11. **Avatares:** el perfil con cuenta usa la foto de Google; el invitado, la mascota. Recomiendo un set de avatares predefinidos (jaguar, cóndor…) en lugar de subir fotos, porque así no hace falta Storage ni moderación de imágenes.
-12. **"Ternas ganadas" en el perfil:** ¿son partidas ganadas o ternas formadas? Definirlo, porque cambia `stats`.
+11. ~~Avatares~~ → set predefinido de fauna colombiana (jaguar, oso de anteojos, cóndor, tucán, guacamaya, rana dorada, chigüiro, perezoso, delfín rosado; fuentes SVG en `diseño/diseño app/avatares/svg/`) más la opción `photo` (foto de Google) para cuentas vinculadas. Sin subir fotos: no hace falta Storage ni moderación. Los demás jugadores no conocen la foto y ven el jaguar.
+12. ~~"Ternas ganadas" en el perfil~~ → son **partidas ganadas**: el perfil muestra la suma de `stats.*.games` y `stats.*.wins` de todos los modos.
 13. **Imagen de tragamonedas en el Jackpot 777:** Google Play pregunta por "juegos de azar simulados" al clasificar la app, y los íconos de tragamonedas pueden subir la clasificación de edad. Las cartas doradas de `ImagenGanar7` transmiten lo mismo sin ese riesgo.

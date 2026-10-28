@@ -33,12 +33,12 @@ import com.ternagames.terna.core.designsystem.component.TernaBackground
 import com.ternagames.terna.core.designsystem.component.TernaRoundIconButton
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 
-/** Marco común de Ajustes, Créditos y Perfil: "← VOLVER", título TERNA y un botón de esquina. */
+/** Marco común de Ajustes, Créditos y Perfil: "← VOLVER", título TERNA y botones de esquina. */
 @Composable
 internal fun SubScreenScaffold(
-    title: String,
+    title: String?,
     onBack: () -> Unit,
-    cornerAction: Pair<String, () -> Unit>?,
+    cornerActions: List<Pair<String, () -> Unit>>,
     snackbar: SnackbarHostState? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -66,14 +66,18 @@ internal fun SubScreenScaffold(
                     Text("TERNA", style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), color = TernaColors.White)
                     Text("MENÚ PRINCIPAL", style = MaterialTheme.typography.labelSmall, color = TernaColors.TextMuted)
                 }
-                cornerAction?.let { (label, action) ->
-                    val icon = if (label == "AJUSTES") Icons.Outlined.Settings else Icons.Outlined.Info
-                    TernaRoundIconButton(icon, label, action, Modifier.align(Alignment.CenterEnd))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.align(Alignment.CenterEnd)) {
+                    cornerActions.forEach { (label, action) ->
+                        val icon = if (label == "AJUSTES") Icons.Outlined.Settings else Icons.Outlined.Info
+                        TernaRoundIconButton(icon, label, action)
+                    }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(title, style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp), color = TernaColors.White)
-            Spacer(Modifier.height(12.dp))
+            if (title != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(title, style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp), color = TernaColors.White)
+                Spacer(Modifier.height(12.dp))
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top,

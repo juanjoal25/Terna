@@ -240,7 +240,7 @@ Documento de perfil, estadísticas y economía del jugador.
 | Campo | Tipo | Quién escribe | Descripción |
 |---|---|---|---|
 | `displayName` | `string` (1–20 caracteres) | Cliente / Servidor | Nombre público |
-| `avatar` | `string` (`a-z 0-9 _`, máx. 32) | Cliente / Servidor | ID de recurso de avatar (`"jaguar_01"`) |
+| `avatar` | `string` (`a-z 0-9 _`, máx. 32) | Cliente / Servidor | ID de avatar: `jaguar_01`, `oso_01`, `condor_01`, `tucan_01`, `guacamaya_01`, `rana_01`, `chiguiro_01`, `perezoso_01`, `delfin_01`, o `photo` (foto de Google, solo cuentas vinculadas). Un ID desconocido se muestra como `jaguar_01` |
 | `anonymous` | `boolean` | Cliente (debe coincidir con la sesión) | Si es cuenta de invitado. Solo puede pasar de `true` a `false`, tras vincular Google/Facebook |
 | `level` | `number` | **Solo Servidor** (el cliente crea con `1`) | Nivel de usuario |
 | `xp` | `number` | **Solo Servidor** (el cliente crea con `0`) | Experiencia acumulada |

@@ -22,6 +22,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:model"))
+
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.graphics)
@@ -29,5 +31,8 @@ dependencies {
     api(libs.androidx.compose.material.icons.extended)
     api(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.ui.text.google.fonts)
+    // Foto de perfil de Google (avatares remotos, ver docs/ARQUITECTURA.md §3.1)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

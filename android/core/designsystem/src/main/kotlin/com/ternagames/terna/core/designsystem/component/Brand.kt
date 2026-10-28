@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,24 +72,6 @@ fun PlayingCard(value: Int?, height: Dp, modifier: Modifier = Modifier) {
         contentDescription = value?.let { "Carta $it" } ?: "Carta boca abajo",
         contentScale = ContentScale.Fit,
         modifier = modifier.height(height).aspectRatio(CARD_ASPECT_RATIO),
-    )
-}
-
-/** Avatar redondo. Por ahora solo existe el jaguar; los demás caen a él. */
-@Composable
-fun PlayerAvatar(avatarId: String, size: Dp, modifier: Modifier = Modifier) {
-    val image = when (avatarId) {
-        "jaguar_01" -> R.drawable.avatar_jaguar_01
-        else -> R.drawable.avatar_jaguar_01
-    }
-    Image(
-        painter = painterResource(image),
-        contentDescription = "Avatar",
-        contentScale = ContentScale.Crop,
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .border(2.dp, TernaColors.Yellow, CircleShape),
     )
 }
 

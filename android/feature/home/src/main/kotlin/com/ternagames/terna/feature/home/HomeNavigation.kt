@@ -3,6 +3,7 @@ package com.ternagames.terna.feature.home
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.ternagames.terna.feature.home.credits.CreditsScreen
+import com.ternagames.terna.feature.home.profile.ProfileScreen
 import com.ternagames.terna.feature.home.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
@@ -15,9 +16,23 @@ data object SettingsRoute
 @Serializable
 data object CreditsRoute
 
-fun NavGraphBuilder.homeScreen(onOpenSettings: () -> Unit, onOpenCredits: () -> Unit, onSignedOut: () -> Unit) {
+@Serializable
+data object ProfileRoute
+
+fun NavGraphBuilder.homeScreen(
+    onOpenProfile: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenCredits: () -> Unit,
+    onSignedOut: () -> Unit,
+) {
     composable<HomeRoute> {
-        HomeScreen(onOpenSettings = onOpenSettings, onOpenCredits = onOpenCredits, onSignedOut = onSignedOut)
+        HomeScreen(onOpenProfile = onOpenProfile, onOpenSettings = onOpenSettings, onOpenCredits = onOpenCredits, onSignedOut = onSignedOut)
+    }
+}
+
+fun NavGraphBuilder.profileScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenCredits: () -> Unit, onSignedOut: () -> Unit) {
+    composable<ProfileRoute> {
+        ProfileScreen(onBack = onBack, onOpenSettings = onOpenSettings, onOpenCredits = onOpenCredits, onSignedOut = onSignedOut)
     }
 }
 

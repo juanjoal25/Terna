@@ -58,7 +58,7 @@ fun SettingsScreen(
     SubScreenScaffold(
         title = "AJUSTES",
         onBack = onBack,
-        cornerAction = "CRÉDITOS" to onOpenCredits,
+        cornerActions = listOf("CRÉDITOS" to onOpenCredits),
         snackbar = snackbar,
     ) {
         TernaPanel(Modifier.widthIn(max = 460.dp).fillMaxWidth()) {
