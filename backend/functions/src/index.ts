@@ -8,7 +8,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { getDeps } from "./db.js";
 import { GameError } from "./lib/errors.js";
-import { gameAction as runGameAction, startMatch as runStartMatch } from "./match/matchService.js";
+import { gameAction as runGameAction, startMatch as runStartMatch, timeoutTurn as runTimeoutTurn } from "./match/matchService.js";
 import { createRoom as runCreateRoom, joinRoom as runJoinRoom, kickPlayer as runKickPlayer, leaveRoom as runLeaveRoom } from "./rooms/roomService.js";
 import type { Deps } from "./rooms/types.js";
 
@@ -48,3 +48,4 @@ export const kickPlayer = callable(runKickPlayer);
 // Partidas
 export const startMatch = callable((deps, uid) => runStartMatch(deps, uid));
 export const gameAction = callable(runGameAction);
+export const timeoutTurn = callable(runTimeoutTurn);

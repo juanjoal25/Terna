@@ -53,6 +53,7 @@ export function toPublicEvent(e: GameEvent): Record<string, unknown> {
       return { ...e, reveal: toPublicReveal(e.reveal) };
     case "TURN_FAILED":
     case "TURN_PASSED":
+    case "TURN_TIMEOUT":
       return { ...e, revealed: e.revealed.map(toPublicReveal) };
     case "SET_COMPLETED":
       return { ...e, cards: e.cards.map(toPublicReveal) };

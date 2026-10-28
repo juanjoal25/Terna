@@ -20,6 +20,7 @@ android {
 
         // Para apuntar a los emuladores locales de Firebase: ./gradlew -PuseEmulators=true (ver docs/FIREBASE_SETUP.md §15).
         buildConfigField("boolean", "USE_EMULATORS", providers.gradleProperty("useEmulators").getOrElse("false"))
+        buildConfigField("int", "EMULATOR_PORT_OFFSET", providers.gradleProperty("emulatorPortOffset").getOrElse("0"))
     }
 
     // Cada entorno usa su propio proyecto de Firebase y su google-services.json:
@@ -81,6 +82,7 @@ dependencies {
     implementation(project(":feature:auth"))
     implementation(project(":feature:home"))
     implementation(project(":feature:room"))
+    implementation(project(":feature:game"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

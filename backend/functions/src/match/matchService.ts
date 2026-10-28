@@ -108,6 +108,11 @@ export async function startMatch(deps: Deps, uid: string): Promise<{ matchId: st
       status: "PLAYING",
       turnSeconds: room.config.turnSeconds,
       createdAt: now,
+      setSize: ruleSet.setSize,
+      allowPass: ruleSet.options.allowPass,
+      allowClaim: ruleSet.options.allowClaim,
+      allowSelfReveal: ruleSet.options.allowSelfReveal,
+      minRevealsBeforePass: ruleSet.options.minRevealsBeforePass,
     };
 
     await db.ref().update(
@@ -132,7 +137,7 @@ export async function startMatch(deps: Deps, uid: string): Promise<{ matchId: st
 export type ActionInput =
   | { type: "REVEAL_HAND"; target: string; end: HandEnd }
   | { type: "REVEAL_CENTER"; slot: number }
-  | { type: "CLAIM"; target: string; value: number; end?: HandEnd }
+  | { type: "CLAIM"; target: string; value: number; end?: HandEnd; count?: number }
   | { type: "PASS" };
 
 const isEnd = (v: unknown): v is HandEnd => v === "LOW" || v === "HIGH";
@@ -151,7 +156,14 @@ export function parseActionInput(raw: unknown): ActionInput {
       return { type: "REVEAL_CENTER", slot: a.slot };
     case "CLAIM":
       if (!isString(a.target) || !isInt(a.value) || (a.end !== undefined && !isEnd(a.end))) throw bad();
-      return { type: "CLAIM", target: a.target, value: a.value, ...(a.end !== undefined ? { end: a.end } : {}) };
+      if (a.count !== undefined && (!isInt(a.count) || a.count < 1 || a.count > 12)) throw bad();
+      return {
+        type: "CLAIM",
+        target: a.target,
+        value: a.value,
+        ...(a.end !== undefined ? { end: a.end } : {}),
+        ...(a.count !== undefined ? { count: a.count } : {}),
+      };
     case "PASS":
       return { type: "PASS" };
     default:
@@ -163,20 +175,53 @@ function pauseAfter(events: GameEvent[]): number {
   if (!events.some((e) => e.type === "TURN_STARTED")) {
     return events.some((e) => e.type === "CLAIM_FAILED") ? PAUSE_MS.claimFailed : 0;
   }
-  if (events.some((e) => e.type === "TURN_FAILED" || e.type === "TURN_PASSED")) return PAUSE_MS.turnFailed;
+  if (events.some((e) => e.type === "TURN_FAILED" || e.type === "TURN_PASSED" || e.type === "TURN_TIMEOUT")) return PAUSE_MS.turnFailed;
   if (events.some((e) => e.type === "SET_COMPLETED")) return PAUSE_MS.setCompleted;
   return 0;
 }
 
-export async function gameAction(
-  deps: Deps,
-  uid: string,
-  rawInput: unknown,
-): Promise<{ seq: number; finished: boolean }> {
+export async function gameAction(deps: Deps, uid: string, rawInput: unknown): Promise<{ seq: number; finished: boolean }> {
   const input = (rawInput ?? {}) as { matchId?: unknown; expectedSeq?: unknown; action?: unknown };
   if (!isString(input.matchId) || !isInt(input.expectedSeq)) throw new GameError("invalid-argument", "INVALID_ARGUMENT");
   const action = parseActionInput(input.action);
-  const { matchId, expectedSeq } = input as { matchId: string; expectedSeq: number };
+
+  return mutateMatch(deps, uid, input.matchId, input.expectedSeq, (stored, now) => {
+    if (now < stored.timing.startsAt - EARLY_TOLERANCE_MS) throw new GameError("failed-precondition", "TOO_EARLY", "Espera a que termine la animación");
+    // El jugador sale de la sesión, nunca de lo que mande la app.
+    return { ...action, player: uid } as Action;
+  });
+}
+
+/**
+ * Cualquier jugador de la mesa puede avisar de que el turno se pasó de tiempo. El servidor lo
+ * comprueba con SU reloj y, si es cierto, pasa el turno. Así una mesa nunca se congela porque
+ * alguien se durmió, sin necesitar un temporizador en el servidor (basta con que haya un cliente vivo).
+ */
+export async function timeoutTurn(deps: Deps, uid: string, rawInput: unknown): Promise<{ seq: number; finished: boolean }> {
+  const input = (rawInput ?? {}) as { matchId?: unknown; expectedSeq?: unknown };
+  if (!isString(input.matchId) || !isInt(input.expectedSeq)) throw new GameError("invalid-argument", "INVALID_ARGUMENT");
+
+  const result = await mutateMatch(deps, uid, input.matchId, input.expectedSeq, (stored, now) => {
+    if (now < stored.timing.deadline) throw new GameError("failed-precondition", "NOT_TIMED_OUT", "Todavía queda tiempo en el turno");
+    return { type: "TIMEOUT", player: stored.game.turn.player };
+  });
+  // Solo llega aquí quien aplicó el tiempo agotado; deja rastro para diagnosticar turnos raros.
+  console.log("Tiempo agotado aplicado", { matchId: input.matchId, reportedBy: uid, seq: result.seq });
+  return result;
+}
+
+/**
+ * Núcleo común de `gameAction` y `timeoutTurn`: dentro de UNA transacción valida que `uid` juegue en la
+ * partida y que el estado sea el que la app vio (`expectedSeq`), aplica la acción con el motor y
+ * publica el resultado completo (mesa pública, manos, estado secreto).
+ */
+async function mutateMatch(
+  deps: Deps,
+  uid: string,
+  matchId: string,
+  expectedSeq: number,
+  chooseAction: (stored: StoredMatch, now: number) => Action,
+): Promise<{ seq: number; finished: boolean }> {
   const { db } = deps;
   const now = deps.now();
 
@@ -188,9 +233,8 @@ export async function gameAction(
     const stored = JSON.parse(node.secret.state) as StoredMatch;
     if (!stored.game.players.includes(uid)) throw new GameError("permission-denied", "NOT_A_PLAYER", "No juegas en esta partida");
     if (stored.game.seq !== expectedSeq) throw new GameError("aborted", "STALE_STATE", "El estado de la mesa cambió");
-    if (now < stored.timing.startsAt - EARLY_TOLERANCE_MS) throw new GameError("failed-precondition", "TOO_EARLY", "Espera a que termine la animación");
 
-    const result = applyAction(stored.game, { ...action, player: uid } as Action);
+    const result = applyAction(stored.game, chooseAction(stored, now));
     if (!result.ok) throw new GameError("failed-precondition", result.error);
 
     const { state: game, events } = result;

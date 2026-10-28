@@ -16,39 +16,32 @@ data object SettingsRoute
 @Serializable
 data object CreditsRoute
 
-<<<<<<< HEAD
-fun NavGraphBuilder.homeScreen(
-    onCreateRoom: () -> Unit,
-    onJoinRoom: () -> Unit,
-=======
 @Serializable
 data object ProfileRoute
 
 fun NavGraphBuilder.homeScreen(
+    onCreateRoom: () -> Unit,
+    onJoinRoom: () -> Unit,
     onOpenProfile: () -> Unit,
->>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
     onOpenSettings: () -> Unit,
     onOpenCredits: () -> Unit,
     onSignedOut: () -> Unit,
 ) {
     composable<HomeRoute> {
-<<<<<<< HEAD
         HomeScreen(
             onCreateRoom = onCreateRoom,
             onJoinRoom = onJoinRoom,
+            onOpenProfile = onOpenProfile,
             onOpenSettings = onOpenSettings,
             onOpenCredits = onOpenCredits,
             onSignedOut = onSignedOut,
         )
-=======
-        HomeScreen(onOpenProfile = onOpenProfile, onOpenSettings = onOpenSettings, onOpenCredits = onOpenCredits, onSignedOut = onSignedOut)
     }
 }
 
 fun NavGraphBuilder.profileScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenCredits: () -> Unit, onSignedOut: () -> Unit) {
     composable<ProfileRoute> {
         ProfileScreen(onBack = onBack, onOpenSettings = onOpenSettings, onOpenCredits = onOpenCredits, onSignedOut = onSignedOut)
->>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
     }
 }
 

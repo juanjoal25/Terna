@@ -62,12 +62,9 @@ private const val COMING_SOON = "La partida rápida llega muy pronto. Por ahora 
 
 @Composable
 fun HomeScreen(
-<<<<<<< HEAD
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
-=======
     onOpenProfile: () -> Unit,
->>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
     onOpenSettings: () -> Unit,
     onOpenCredits: () -> Unit,
     onSignedOut: () -> Unit,

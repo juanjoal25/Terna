@@ -7,9 +7,17 @@ import type { Card, GameState, HandEnd, PlayerId } from "./types.js";
 export function hiddenEndIndex(state: GameState, owner: PlayerId, end: HandEnd): number | null {
   const hand = state.hands[owner];
   if (!hand) return null;
-  const taken = new Set(
-    state.turn.revealed.filter((r) => r.source === "HAND" && r.owner === owner).map((r) => (r.source === "HAND" ? r.index : -1)),
-  );
+  return endIndex(hand, takenIndexes(state, owner), end);
+}
+
+/** Posiciones de la mano de `owner` que ya se destaparon este turno. */
+function takenIndexes(state: GameState, owner: PlayerId): Set<number> {
+  const taken = new Set<number>();
+  for (const r of state.turn.revealed) if (r.source === "HAND" && r.owner === owner) taken.add(r.index);
+  return taken;
+}
+
+function endIndex(hand: readonly Card[], taken: ReadonlySet<number>, end: HandEnd): number | null {
   if (end === "LOW") {
     for (let i = 0; i < hand.length; i++) if (!taken.has(i)) return i;
   } else {
@@ -20,6 +28,39 @@ export function hiddenEndIndex(state: GameState, owner: PlayerId, end: HandEnd):
 
 export function hasHiddenCards(state: GameState, owner: PlayerId): boolean {
   return hiddenEndIndex(state, owner, "LOW") !== null;
+}
+
+/** Cartas de `owner` que siguen ocultas este turno. */
+export function hiddenCount(state: GameState, owner: PlayerId): number {
+  return (state.hands[owner]?.length ?? 0) - takenIndexes(state, owner).size;
+}
+
+export interface HandPick {
+  index: number;
+  end: HandEnd;
+}
+
+/**
+ * Si `owner` tiene `count` cartas de `value` seguidas en sus extremos (cualquier mezcla de menores y
+ * mayores, sin saltarse ninguna), devuelve cuáles son, en orden. Si no, null.
+ * Con `end` solo se mira ese extremo. Es lo que permite pedir "dos 5" de una sola vez.
+ */
+export function planHandCards(state: GameState, owner: PlayerId, value: Card, count: number, end?: HandEnd): HandPick[] | null {
+  const hand = state.hands[owner];
+  if (!hand) return null;
+  const taken = takenIndexes(state, owner);
+  const ends: HandEnd[] = end ? [end] : ["LOW", "HIGH"];
+  const picks: HandPick[] = [];
+  for (let n = 0; n < count; n++) {
+    const found = ends.flatMap((e) => {
+      const index = endIndex(hand, taken, e);
+      return index !== null && hand[index] === value ? [{ index, end: e }] : [];
+    })[0];
+    if (!found) return null;
+    taken.add(found.index);
+    picks.push(found);
+  }
+  return picks;
 }
 
 /** Huecos del centro que aún tienen carta y no se han revelado este turno. */
@@ -37,6 +78,17 @@ export function currentTurnValue(state: GameState): Card | null {
 export function hasOtherSources(state: GameState): boolean {
   const me = state.turn.player;
   return hiddenCenterSlots(state).length > 0 || state.players.some((p) => p !== me && hasHiddenCards(state, p));
+}
+
+/**
+ * Cartas de la propia mano del jugador activo que, destapadas ahora, completan el set (p. ej. tiene
+ * dos 5 seguidos y ya hay uno en la mesa). null si no alcanzan. El motor las destapa solo.
+ */
+export function ownCardsToComplete(state: GameState): HandPick[] | null {
+  const value = currentTurnValue(state);
+  const missing = state.ruleSet.setSize - state.turn.revealed.length;
+  if (value === null || missing < 1) return null;
+  return planHandCards(state, state.turn.player, value, missing);
 }
 
 /**

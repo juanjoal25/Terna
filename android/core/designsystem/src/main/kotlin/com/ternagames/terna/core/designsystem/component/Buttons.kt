@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 
 /**
@@ -182,5 +183,41 @@ fun TernaBackButton(onClick: () -> Unit, modifier: Modifier = Modifier, text: St
         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = TernaColors.White)
         Spacer(Modifier.width(6.dp))
         Text(text, style = MaterialTheme.typography.labelLarge, color = TernaColors.White)
+    }
+}
+
+/**
+ * Botón pequeño para el panel de acciones de la mesa. Habilitado: amarillo; deshabilitado: gris
+ * translúcido, como en el diseño ("REVELAR CENTRO" / "PREGUNTAR" en turno ajeno).
+ */
+@Composable
+fun TernaCompactButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .defaultMinSize(minHeight = 34.dp)
+            .clip(shape)
+            .background(if (enabled) TernaColors.Yellow else Color(0x33FFFFFF))
+            .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = TernaColors.OnYellow, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+        } else {
+            Text(
+                text,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 11.sp),
+                color = if (enabled) TernaColors.OnYellow else TernaColors.TextMuted,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
     }
 }

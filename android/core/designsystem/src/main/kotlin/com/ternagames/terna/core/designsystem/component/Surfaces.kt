@@ -31,6 +31,8 @@ enum class TernaBackdrop(@param:DrawableRes val image: Int) {
     Home(R.drawable.bg_home),
     /** Azul con destellos: sala de espera. */
     Lobby(R.drawable.bg_lobby),
+    /** Mesa de madera con "TERNA" grabado: pantalla de juego. */
+    Table(R.drawable.bg_mesa),
 }
 
 /** Fondo a pantalla completa con un velo para que el texto se lea. */

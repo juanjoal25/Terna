@@ -198,6 +198,17 @@ Consola → **Authentication → Comenzar** → pestaña **Método de acceso**.
   ```bash
   firebase functions:artifacts:setpolicy
   ```
+- [ ] **Permiso de compilación (obligatorio en proyectos nuevos o dentro de una organización).** Si `firebase deploy --only functions` falla con *"Could not build the function due to a missing permission on the build service account"*, a la cuenta de servicio de compilación le falta un rol. En Google Cloud → **IAM** → **Otorgar acceso**:
+  - Principal: `NÚMERO_DEL_PROYECTO-compute@developer.gserviceaccount.com` (en `terna-dev` es `858929285767-compute@developer.gserviceaccount.com`).
+  - Rol: **Cuenta de servicio de Cloud Build** (`roles/cloudbuild.builds.builder`).
+  Si la organización lo bloquea, un administrador de la UPB debe otorgarlo.
+- [ ] **Permisos de ejecución sobre las bases de datos (obligatorio en proyectos nuevos).** La misma cuenta (`…-compute@developer.gserviceaccount.com`) es la que *ejecuta* las funciones, y en proyectos nuevos no trae acceso a Realtime Database ni a Firestore. Síntoma: crear sala se queda cargando y termina en «sin conexión»; en el log de `createRoom` sale *"@firebase/database: FIREBASE WARNING: Provided authentication credentials … are invalid"* y luego *"maximum request timeout"*. En IAM → **Otorgar acceso**, a esa cuenta:
+  - **Administrador de Firebase Realtime Database** (`roles/firebasedatabase.admin`)
+  - **Usuario de Cloud Datastore** (`roles/datastore.user`, da acceso a Firestore)
+- [ ] **Tiempo de análisis en Windows.** Si el despliegue o el emulador fallan con *"User code failed to load… Timeout after 10000"*, aunque el código cargue bien, amplía el plazo (en PowerShell, desde `backend/`):
+  ```powershell
+  $env:FUNCTIONS_DISCOVERY_TIMEOUT = 180
+  ```
 - [ ] **Permisos para encolar tareas**: la cuenta de servicio de las funciones (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) necesita, en Google Cloud → IAM, los roles:
   - **Encolador de Cloud Tasks** (`roles/cloudtasks.enqueuer`)
   - **Usuario de cuenta de servicio** (`roles/iam.serviceAccountUser`)
@@ -334,6 +345,17 @@ backend/
   ```
 - [ ] Prod se despliega solo desde CI al crear un *tag* (ARQUITECTURA §9). Para CI, crea en Google Cloud una **cuenta de servicio de despliegue** con los roles "Administrador de Firebase" y "Usuario de cuenta de servicio", y guarda su clave JSON como secreto de GitHub (`FIREBASE_SERVICE_ACCOUNT_DEV` / `_PROD`). Nunca la subas al repositorio.
 
+### Funciones públicas (verificar tras el primer despliegue de cada entorno)
+
+Los callable se llaman desde la app con un token de **Firebase Auth**, no de Google IAM. La autenticación la valida el propio código (`request.auth`), así que el servicio de Cloud Run debe aceptar invocaciones de cualquiera (`allUsers` con el rol *Invocador de Cloud Run*). Firebase lo configura al **crear** una función, pero si el que despliega no puede cambiar permisos de IAM (o el primer despliegue falló a medias) las funciones quedan privadas y las actualizaciones posteriores no lo corrigen.
+
+- [ ] Verifica con `curl` (sustituye el proyecto):
+  ```bash
+  curl -s -X POST -H "Content-Type: application/json" -d '{"data":{}}' https://us-central1-terna-dev-718c7.cloudfunctions.net/ping
+  ```
+  Correcto: JSON `{"error":{"message":"Inicia sesión para usar TERNA!","status":"UNAUTHENTICATED"}}`. Incorrecto: una página HTML «403 Forbidden».
+- [ ] Si salen privadas: Consola de Google Cloud → **Cloud Run** (proyecto correcto) → marca las 8 funciones (`ping`, `createroom`, `joinroom`, `leaveroom`, `kickplayer`, `startmatch`, `gameaction`, `timeoutturn`) → **Permisos** → *Agregar principal* `allUsers`, rol **Invocador de Cloud Run** → Guardar. Hace falta un rol que pueda cambiar IAM (Propietario).
+
 ---
 
 ## 15. Emuladores (desarrollo diario)
@@ -400,5 +422,6 @@ backend/
 | Funciona en debug, falla la versión de Play | Falta la huella de **Play App Signing** (Firebase, Meta y assetlinks) |
 | `PERMISSION_DENIED` en RTDB o Firestore | Esperado si el cliente intenta escribir partidas: solo escriben las funciones |
 | Callable responde `unauthenticated` o App Check falla en el emulador | Falta registrar el token de depuración de App Check |
+| En el teléfono, al crear sala: "Tu sesión expiró" (aunque haya sesión) y en el log de la función: *"The request was not authorized to invoke this service. The access token could not be verified"* | La función quedó **privada** en Cloud Run (falta `allUsers` → *Invocador de Cloud Run*) y Google rechaza el token de Firebase antes de que corra el código. El emulador no lo detecta. Ver «Funciones públicas» abajo |
 | El despliegue falla por "API not enabled" | Abre el enlace del error y activa la API |
 | Los enlaces `/sala/...` abren el navegador en vez de la app | `assetlinks.json` con SHA incorrecto, o falta `android:autoVerify="true"` en el *intent filter* |

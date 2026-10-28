@@ -322,13 +322,18 @@ El cliente **nunca escribe** salas ni partidas: solo llama a estas funciones con
 | `leaveRoom` | — | `{ left }` | `ROOM_IN_MATCH` |
 | `kickPlayer` | `{ targetUid }` | — | `NOT_HOST`, `CANNOT_KICK_SELF`, `NOT_A_MEMBER`, `NOT_IN_ROOM` |
 | `startMatch` | — (usa la sala del usuario) | `{ matchId }` | `NOT_HOST`, `NOT_ENOUGH_PLAYERS`, `ROOM_STARTED`, `NOT_IN_ROOM` |
+| `timeoutTurn` | `{ matchId, expectedSeq }` | `{ seq, finished }` | `NOT_TIMED_OUT`, `STALE_STATE`, `NOT_A_PLAYER`, `GAME_OVER` |
 | `gameAction` | `{ matchId, expectedSeq, action }` | `{ seq, finished }` | `NOT_YOUR_TURN`, `STALE_STATE`, `TOO_EARLY`, `GAME_OVER`, `INVALID_ACTION` y los del motor (`INVALID_SLOT`, `PASS_DISABLED`, `CLAIM_VALUE_MISMATCH`…) |
 
 `action` es uno de: `{type:"REVEAL_HAND", target, end:"LOW"|"HIGH"}`, `{type:"REVEAL_CENTER", slot}`, `{type:"CLAIM", target, value, end?}` o `{type:"PASS"}`.
 
 **`expectedSeq`** es el `live.seq` que la app tenía al tocar. Si otra jugada llegó antes, el servidor responde `STALE_STATE` y la app simplemente espera al estado nuevo (esto cubre el doble toque). **`TOO_EARLY`** protege la pausa tras un fallo: nadie juega antes de `live.turn.startsAt`, así todos alcanzan a ver las cartas.
 
-Pendiente (fase siguiente): temporizador de turno con Cloud Tasks, bots que reemplacen a quien se desconecte, y la cola de partida rápida.
+**Tiempo agotado sin servidor de temporizadores:** cada turno trae `live.turn.deadline`. Cuando se pasa, **cualquier jugador de la mesa** llama a `timeoutTurn`; el servidor lo comprueba con su propio reloj y, si es cierto, pasa el turno (evento `TURN_TIMEOUT`; las cartas reveladas vuelven a su sitio). La app de quien tiene el turno avisa primero y las demás esperan escalonadas por asiento. Una mesa nunca se congela porque alguien se durmió, y no hace falta Cloud Tasks.
+
+**`meta` publica las reglas activas** (`setSize`, `allowPass`, `allowClaim`, `allowSelfReveal`, `minRevealsBeforePass`) para que la app muestre solo los botones que aplican.
+
+Pendiente: bots que reemplacen a quien se desconecte (y la partida rápida, que los necesita), presencia y expulsar a quien se duerme varias veces seguidas.
 
 ---
 

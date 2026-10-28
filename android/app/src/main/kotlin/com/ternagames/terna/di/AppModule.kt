@@ -24,5 +24,6 @@ object AppModule {
     fun firebaseConfig(@ApplicationContext context: Context) = FirebaseConfig(
         webClientId = context.getString(R.string.default_web_client_id),
         useEmulators = BuildConfig.USE_EMULATORS,
+        emulatorPortOffset = BuildConfig.EMULATOR_PORT_OFFSET,
     )
 }

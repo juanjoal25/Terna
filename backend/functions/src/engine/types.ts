@@ -111,8 +111,11 @@ export interface GameState {
 export type Action =
   | { type: "REVEAL_HAND"; player: PlayerId; target: PlayerId; end: HandEnd }
   | { type: "REVEAL_CENTER"; player: PlayerId; slot: number }
-  | { type: "CLAIM"; player: PlayerId; target: PlayerId; value: Card; end?: HandEnd }
-  | { type: "PASS"; player: PlayerId };
+  /** `count` (por defecto 1): cuántas cartas seguidas de `value` se afirma que tiene el rival. Todo o nada. */
+  | { type: "CLAIM"; player: PlayerId; target: PlayerId; value: Card; end?: HandEnd; count?: number }
+  | { type: "PASS"; player: PlayerId }
+  /** Se acabó el tiempo del turno. Solo la genera el servidor: el turno pasa sin penalizar las cartas. */
+  | { type: "TIMEOUT"; player: PlayerId };
 
 type EventBody =
   | { type: "TURN_STARTED"; player: PlayerId; number: number }
@@ -120,6 +123,7 @@ type EventBody =
   | { type: "CLAIM_FAILED"; player: PlayerId; target: PlayerId; value: Card; taunt: "AURA_MINUS_1000" }
   | { type: "TURN_FAILED"; player: PlayerId; revealed: Reveal[] }
   | { type: "TURN_PASSED"; player: PlayerId; revealed: Reveal[] }
+  | { type: "TURN_TIMEOUT"; player: PlayerId; revealed: Reveal[] }
   | { type: "SET_COMPLETED"; player: PlayerId; value: Card; cards: Reveal[] }
   | { type: "GAME_OVER"; result: GameResult };
 
@@ -141,6 +145,7 @@ export type EngineErrorCode =
   | "CLAIM_END_REQUIRED"
   | "CLAIM_VALUE_MISMATCH"
   | "INVALID_VALUE"
+  | "INVALID_COUNT"
   | "PASS_DISABLED"
   | "PASS_TOO_EARLY";
 

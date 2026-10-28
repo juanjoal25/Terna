@@ -10,6 +10,8 @@ import com.ternagames.terna.feature.auth.LoginRoute
 import com.ternagames.terna.feature.auth.SplashRoute
 import com.ternagames.terna.feature.auth.loginScreen
 import com.ternagames.terna.feature.auth.splashScreen
+import com.ternagames.terna.feature.game.GameRoute
+import com.ternagames.terna.feature.game.gameScreen
 import com.ternagames.terna.feature.home.CreditsRoute
 import com.ternagames.terna.feature.home.HomeRoute
 import com.ternagames.terna.feature.home.ProfileRoute
@@ -26,11 +28,7 @@ import com.ternagames.terna.feature.room.joinRoomScreen
 import com.ternagames.terna.feature.room.waitingRoomScreen
 
 /**
-<<<<<<< HEAD
- * Splash → Login → Home → (Crear | Unirse) → Sala de espera → Mesa.
-=======
- * Splash → Login → Home (+ Perfil, Ajustes y Créditos).
->>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
+ * Splash → Login → Home (+ Perfil, Ajustes y Créditos) → (Crear | Unirse) → Sala de espera → Mesa.
  * Al entrar o salir de la sesión se limpia la pila para que "atrás" no regrese al login.
  */
 @Composable
@@ -47,12 +45,9 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
         )
         loginScreen(onSignedIn = { navController.resetTo(HomeRoute) })
         homeScreen(
-<<<<<<< HEAD
             onCreateRoom = { navController.navigate(CreateRoomRoute) { launchSingleTop = true } },
             onJoinRoom = { navController.navigate(JoinRoomRoute) { launchSingleTop = true } },
-=======
             onOpenProfile = { navController.navigate(ProfileRoute) { launchSingleTop = true } },
->>>>>>> bb1337f5d2b6446a58a5681d8c0db8723091ddc6
             onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
             onOpenCredits = { navController.navigate(CreditsRoute) { launchSingleTop = true } },
             onSignedOut = { navController.resetTo(LoginRoute) },
@@ -78,7 +73,11 @@ fun TernaNavHost(navController: NavHostController = rememberNavController()) {
         joinRoomScreen(onBack = navController::popBackStack, onJoined = { navController.enterWaitingRoom(it) })
         waitingRoomScreen(
             onExit = { navController.resetTo(HomeRoute) },
-            onMatchStarted = { /* La mesa de juego se conecta en el siguiente paso. */ },
+            onMatchStarted = { matchId -> navController.navigate(GameRoute(matchId)) { popUpTo(HomeRoute); launchSingleTop = true } },
+        )
+        gameScreen(
+            onBackToRoom = { roomId -> navController.navigate(WaitingRoomRoute(roomId)) { popUpTo(HomeRoute); launchSingleTop = true } },
+            onGoHome = { navController.resetTo(HomeRoute) },
         )
     }
 }

@@ -29,6 +29,12 @@ export interface MatchNode {
     turnSeconds: number;
     createdAt: number;
     endedAt?: number;
+    /** Reglas activas: la app las usa para mostrar solo los botones que aplican. */
+    setSize: number;
+    allowPass: boolean;
+    allowClaim: boolean;
+    allowSelfReveal: boolean;
+    minRevealsBeforePass: number;
   };
   players: Record<string, MatchPlayerBase & { handCount: number; sets?: number[] }>;
   live: Record<string, unknown>;

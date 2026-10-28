@@ -11,6 +11,8 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.functions
 import com.ternagames.terna.core.data.auth.AuthRepository
 import com.ternagames.terna.core.data.auth.FirebaseAuthRepository
+import com.ternagames.terna.core.data.match.FirebaseMatchRepository
+import com.ternagames.terna.core.data.match.MatchRepository
 import com.ternagames.terna.core.data.room.FirebaseRoomRepository
 import com.ternagames.terna.core.data.room.RoomRepository
 import com.ternagames.terna.core.data.user.FirestoreUserRepository
@@ -29,6 +31,8 @@ data class FirebaseConfig(
     /** Si es true, todos los SDK apuntan a los emuladores locales en [emulatorHost]. */
     val useEmulators: Boolean,
     val emulatorHost: String = "10.0.2.2",
+    /** Se suma a los puertos de los emuladores (9099, 9000, 8080, 5001): permite correr varios a la vez. */
+    val emulatorPortOffset: Int = 0,
 )
 
 @Module
@@ -38,26 +42,26 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun auth(config: FirebaseConfig): FirebaseAuth = Firebase.auth.apply {
-        if (config.useEmulators) useEmulator(config.emulatorHost, 9099)
+        if (config.useEmulators) useEmulator(config.emulatorHost, 9099 + config.emulatorPortOffset)
     }
 
     @Provides
     @Singleton
     fun firestore(config: FirebaseConfig): FirebaseFirestore = Firebase.firestore.apply {
-        if (config.useEmulators) useEmulator(config.emulatorHost, 8080)
+        if (config.useEmulators) useEmulator(config.emulatorHost, 8080 + config.emulatorPortOffset)
     }
 
     @Provides
     @Singleton
     fun database(config: FirebaseConfig): FirebaseDatabase = Firebase.database.apply {
-        if (config.useEmulators) useEmulator(config.emulatorHost, 9000)
+        if (config.useEmulators) useEmulator(config.emulatorHost, 9000 + config.emulatorPortOffset)
     }
 
     /** Misma región que las Cloud Functions (us-central1). */
     @Provides
     @Singleton
     fun functions(config: FirebaseConfig): FirebaseFunctions = Firebase.functions("us-central1").apply {
-        if (config.useEmulators) useEmulator(config.emulatorHost, 5001)
+        if (config.useEmulators) useEmulator(config.emulatorHost, 5001 + config.emulatorPortOffset)
     }
 }
 
@@ -72,4 +76,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun roomRepository(impl: FirebaseRoomRepository): RoomRepository
+
+    @Binds
+    abstract fun matchRepository(impl: FirebaseMatchRepository): MatchRepository
 }

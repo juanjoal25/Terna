@@ -38,7 +38,7 @@ describe("revelar cartas", () => {
 
   it("forma una terna con cartas de otra mano, del centro y de la propia", () => {
     const g = fixedGame({ hands: { A: [1, 8], B: [1, 9], C: [4, 6] }, center: [1, 2] });
-    const { state, events } = playAll(g, [revealHand("A", "B", "LOW"), revealCenter("A", 0), revealHand("A", "A", "LOW")]);
+    const { state, events } = playAll(g, [revealHand("A", "B", "LOW"), revealCenter("A", 0)]);
     expect(eventTypes(events)).toEqual(["CARD_REVEALED", "CARD_REVEALED", "CARD_REVEALED", "SET_COMPLETED", "TURN_STARTED"]);
     expect(state.sets.A).toEqual([1]);
     expect(state.hands).toEqual({ A: [8], B: [9], C: [4, 6] });
@@ -57,7 +57,7 @@ describe("revelar cartas", () => {
   it("con continueAfterSet el jugador sigue tras la terna", () => {
     const rs = withOptions(TERNA_CLASSIC, { continueAfterSet: true });
     const g = fixedGame({ ruleSet: rs, hands: { A: [1, 8], B: [1, 9], C: [4] }, center: [1] });
-    const { state } = playAll(g, [revealHand("A", "B", "LOW"), revealCenter("A", 0), revealHand("A", "A", "LOW")]);
+    const { state } = playAll(g, [revealHand("A", "B", "LOW"), revealCenter("A", 0)]);
     expect(state.turn).toEqual({ player: "A", number: 1, revealed: [] });
   });
 });
@@ -116,7 +116,7 @@ describe("deducir (CLAIM)", () => {
 
   it("se puede completar la terna deduciendo", () => {
     const g = fixedGame({ hands: { A: [6], B: [6, 9], C: [2, 6] }, center: [6] });
-    const { state } = playAll(g, [claim("A", "B", 6), claim("A", "C", 6), revealHand("A", "A", "LOW")]);
+    const { state } = playAll(g, [claim("A", "B", 6), claim("A", "C", 6)]);
     expect(state.sets.A).toEqual([6]);
   });
 
@@ -154,6 +154,24 @@ describe("pasar turno", () => {
   });
 });
 
+describe("tiempo agotado", () => {
+  it("pasa el turno al siguiente, devuelve las cartas reveladas y no cuenta como fallo de otro", () => {
+    const g = fixedGame({ hands: { A: [3, 8], B: [1, 9], C: [4, 6] }, center: [2] });
+    const afterReveal = play(g, revealHand("A", "B", "LOW")).state;
+    const { state, events } = play(afterReveal, { type: "TIMEOUT", player: "A" });
+
+    expect(eventTypes(events)).toEqual(["TURN_TIMEOUT", "TURN_STARTED"]);
+    expect(events[0]).toMatchObject({ type: "TURN_TIMEOUT", player: "A" });
+    expect(state.turn).toEqual({ player: "B", number: 2, revealed: [] });
+    expect(state.hands).toEqual(g.hands);
+  });
+
+  it("solo se acepta para el jugador del turno", () => {
+    const g = fixedGame({ hands: { A: [3], B: [1], C: [4] }, center: [2] });
+    expectRejected(g, { type: "TIMEOUT", player: "B" }, "NOT_YOUR_TURN");
+  });
+});
+
 describe("victoria", () => {
   const winWith = (ruleSet: RuleSet, value: number, previousSets: number[]): GameState => {
     const g = fixedGame({
@@ -162,7 +180,7 @@ describe("victoria", () => {
       center: [value === 12 ? 1 : 12],
       sets: { A: previousSets },
     });
-    return playAll(g, [revealHand("A", "B", "LOW"), revealHand("A", "C", "LOW"), revealHand("A", "A", "LOW")]).state;
+    return playAll(g, [revealHand("A", "B", "LOW"), revealHand("A", "C", "LOW")]).state;
   };
 
   it("la terna de 7 gana al instante", () => {
@@ -188,7 +206,7 @@ describe("victoria", () => {
   it("si se acaban las cartas sin ganador, gana quien tenga más sets (con empate)", () => {
     const rs: RuleSet = { ...TERNA_CLASSIC, win: { setsNeeded: 5, instantWinValues: [], linkedPairTarget: null } };
     const g = fixedGame({ ruleSet: rs, hands: { A: [2], B: [2], C: [2] }, center: [null], sets: { A: [1], B: [3, 4] } });
-    const { state } = playAll(g, [revealHand("A", "B", "LOW"), revealHand("A", "C", "LOW"), revealHand("A", "A", "LOW")]);
+    const { state } = playAll(g, [revealHand("A", "B", "LOW"), revealHand("A", "C", "LOW")]);
     expect(state.result).toEqual({ winners: ["A", "B"], reason: "EXHAUSTED" });
   });
 
@@ -231,5 +249,65 @@ describe("validaciones", () => {
     const { state, events } = playAll(h, [revealHand("A", "B", "LOW"), revealCenter("A", 0)]);
     expect(events.map((e) => e.seq)).toEqual([2, 3, 4, 5]);
     expect(state.seq).toBe(5);
+  });
+});
+
+describe("cartas repetidas en la misma mano", () => {
+  const claimN = (player: string, target: string, value: number, count: number) =>
+    ({ type: "CLAIM", player, target, value, count }) as const;
+
+  it("se pueden pedir dos cartas iguales seguidas a la vez", () => {
+    const g = fixedGame({ hands: { A: [3, 8], B: [5, 5, 9], C: [5, 6] }, center: [2] });
+    const { state, events } = play(g, claimN("A", "B", 5, 2));
+    expect(eventTypes(events)).toEqual(["CARD_REVEALED", "CARD_REVEALED"]);
+    expect(state.turn.revealed.map((r) => [r.source === "HAND" && r.owner, r.value])).toEqual([["B", 5], ["B", 5]]);
+    // Con la tercera completa la terna.
+    const done = play(state, claim("A", "C", 5)).state;
+    expect(done.sets.A).toEqual([5]);
+    expect(done.hands.B).toEqual([9]);
+  });
+
+  it("pedir dos cuando solo hay una seguida falla con aura y no revela nada", () => {
+    const g = fixedGame({ hands: { A: [3], B: [5, 7, 9], C: [1] }, center: [2] });
+    const { state, events } = play(g, claimN("A", "B", 5, 2));
+    expect(eventTypes(events)).toEqual(["CLAIM_FAILED", "TURN_FAILED", "TURN_STARTED"]);
+    expect(state.hands).toEqual(g.hands);
+  });
+
+  it("rechaza cantidades imposibles sin penalizar", () => {
+    const g = fixedGame({ hands: { A: [3], B: [5, 5], C: [1] }, center: [2] });
+    expectRejected(g, claimN("A", "B", 5, 0), "INVALID_COUNT");
+    expectRejected(g, claimN("A", "B", 5, 3), "INVALID_COUNT"); // B solo tiene 2 cartas
+    const one = play(g, claim("A", "B", 5)).state;
+    expectRejected(one, claimN("A", "B", 5, 2), "INVALID_COUNT"); // solo queda 1 oculta
+  });
+
+  it("si tienes dos iguales seguidas y aciertas la tercera, la terna se completa sola", () => {
+    const g = fixedGame({ hands: { A: [5, 5, 9], B: [2, 5], C: [1] }, center: [4] });
+    const { state, events } = play(g, claim("A", "B", 5));
+    expect(eventTypes(events)).toEqual(["CARD_REVEALED", "CARD_REVEALED", "CARD_REVEALED", "SET_COMPLETED", "TURN_STARTED"]);
+    expect(state.sets.A).toEqual([5]);
+    expect(state.hands).toEqual({ A: [9], B: [2], C: [1] });
+  });
+
+  it("también se completa sola al destapar el centro o la mano de otro", () => {
+    const g = fixedGame({ hands: { A: [5, 5, 9], B: [5, 8], C: [1] }, center: [4] });
+    expect(play(g, revealHand("A", "B", "LOW")).state.sets.A).toEqual([5]);
+    const c = fixedGame({ hands: { A: [5, 5, 9], B: [2, 8], C: [1] }, center: [5] });
+    expect(play(c, revealCenter("A", 0)).state.sets.A).toEqual([5]);
+  });
+
+  it("no se completa sola si tus cartas iguales no están en un extremo", () => {
+    // Mano ordenada [3,5,5,9]: los 5 quedan en medio, así que no se pueden destapar.
+    const g = fixedGame({ hands: { A: [3, 5, 5, 9], B: [5, 8], C: [1] }, center: [4] });
+    const after = play(g, revealHand("A", "B", "LOW")).state;
+    expect(after.sets.A).toEqual([]);
+    expect(after.turn.revealed).toHaveLength(1);
+  });
+
+  it("no se completa sola si las reglas de la sala no dejan revelar la propia mano", () => {
+    const rs = withOptions(TERNA_CLASSIC, { allowSelfReveal: false });
+    const g = fixedGame({ ruleSet: rs, hands: { A: [5, 5, 9], B: [2, 5], C: [1] }, center: [4] });
+    expect(play(g, claim("A", "B", 5)).state.turn.revealed).toHaveLength(1);
   });
 });

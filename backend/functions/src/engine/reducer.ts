@@ -1,4 +1,4 @@
-import { currentTurnValue, hasHiddenCards, hasOtherSources, hiddenEndIndex } from "./queries.js";
+import { currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, ownCardsToComplete, planHandCards } from "./queries.js";
 import type {
   Action,
   ApplyResult,
@@ -37,6 +37,7 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
 
   const next = structuredClone(state);
   const out = new Emitter(next);
+  const turnBefore = state.turn.number;
   let error: EngineErrorCode | null;
 
   switch (action.type) {
@@ -47,14 +48,25 @@ export function applyAction(state: GameState, action: Action): ApplyResult {
       error = revealCenter(next, out, action.slot);
       break;
     case "CLAIM":
-      error = claim(next, out, action.target, action.value, action.end);
+      error = claim(next, out, action.target, action.value, action.end, action.count ?? 1);
       break;
     case "PASS":
       error = pass(next, out);
       break;
+    case "TIMEOUT":
+      out.emit({ type: "TURN_TIMEOUT", player: next.turn.player, revealed: next.turn.revealed });
+      endTurn(next, out);
+      error = null;
+      break;
   }
 
-  return error ? reject(error) : { ok: true, state: next, events: out.events };
+  if (error) return reject(error);
+
+  // Si el turno sigue abierto y las cartas de tu propia mano completan el set, se destapan solas.
+  if (next.status === "PLAYING" && next.turn.number === turnBefore && out.events.some((e) => e.type === "CARD_REVEALED")) {
+    completeWithOwnHand(next, out);
+  }
+  return { ok: true, state: next, events: out.events };
 }
 
 function revealHand(state: GameState, out: Emitter, target: PlayerId, end: HandEnd): EngineErrorCode | null {
@@ -81,11 +93,11 @@ function revealCenter(state: GameState, out: Emitter, slot: number): EngineError
 }
 
 /**
- * "Deducir": el jugador afirma que `target` tiene `value` como su carta menor o mayor.
- * Si acierta, la carta se le entrega (cuenta como revelada). Si no, "-1000 de aura".
+ * "Deducir": el jugador afirma que `target` tiene `count` cartas de `value` seguidas en sus extremos
+ * (menor o mayor). Si acierta, se le entregan (cuentan como reveladas). Si no, "-1000 de aura".
  */
-function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, end?: HandEnd): EngineErrorCode | null {
-  const { options, maxNumber } = state.ruleSet;
+function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, end: HandEnd | undefined, count: number): EngineErrorCode | null {
+  const { options, maxNumber, setSize } = state.ruleSet;
   if (!options.allowClaim) return "CLAIM_DISABLED";
   if (!state.players.includes(target)) return "UNKNOWN_PLAYER";
   if (target === state.turn.player) return "CLAIM_SELF";
@@ -96,14 +108,15 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
   // Si ya se está persiguiendo un número, deducir otro no tiene sentido: se rechaza sin penalizar.
   const chasing = currentTurnValue(state);
   if (chasing !== null && chasing !== value) return "CLAIM_VALUE_MISMATCH";
+  // No se puede pedir más de lo que falta para la terna ni más cartas de las que el rival aún tiene ocultas.
+  if (!Number.isInteger(count) || count < 1 || count > setSize - state.turn.revealed.length || count > hiddenCount(state, target)) {
+    return "INVALID_COUNT";
+  }
 
-  const ends: HandEnd[] = end ? [end] : ["LOW", "HIGH"];
-  for (const e of ends) {
-    const index = hiddenEndIndex(state, target, e);
-    if (index !== null && state.hands[target]![index] === value) {
-      resolveReveal(state, out, { source: "HAND", owner: target, index, end: e, value, claimed: true });
-      return null;
-    }
+  const picks = planHandCards(state, target, value, count, end);
+  if (picks) {
+    for (const pick of picks) resolveReveal(state, out, { source: "HAND", owner: target, index: pick.index, end: pick.end, value, claimed: true });
+    return null;
   }
 
   out.emit({ type: "CLAIM_FAILED", player: state.turn.player, target, value, taunt: "AURA_MINUS_1000" });
@@ -112,6 +125,17 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
     endTurn(state, out);
   }
   return null;
+}
+
+/** Destapa las cartas de tu propia mano que faltan para la terna (si las tienes seguidas en un extremo). */
+function completeWithOwnHand(state: GameState, out: Emitter): void {
+  if (!state.ruleSet.options.allowSelfReveal) return;
+  const picks = ownCardsToComplete(state);
+  if (!picks) return;
+  const me = state.turn.player;
+  for (const pick of picks) {
+    resolveReveal(state, out, { source: "HAND", owner: me, index: pick.index, end: pick.end, value: state.hands[me]![pick.index]!, claimed: false });
+  }
 }
 
 function pass(state: GameState, out: Emitter): EngineErrorCode | null {

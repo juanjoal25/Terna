@@ -26,8 +26,11 @@ export function seededRng(seed: number): Rng {
  * quien conozca su propia mano podría probar todas las semillas y deducir las manos de los demás.
  */
 export function secureRng(): Rng {
-  return () => randomInt(0, 2 ** 48) / 2 ** 48;
+  // `randomInt` admite rangos de hasta 2^48 − 1, así que se piden 47 bits (de sobra para barajar).
+  return () => randomInt(0, SECURE_RANGE) / SECURE_RANGE;
 }
+
+const SECURE_RANGE = 2 ** 47;
 
 /** Fisher–Yates sobre una copia del arreglo. */
 export function shuffle<T>(items: readonly T[], rng: Rng): T[] {

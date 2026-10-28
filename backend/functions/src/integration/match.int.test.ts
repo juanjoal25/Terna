@@ -3,7 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { availableActions, hiddenEndIndex, seededRng, type Action, type GameState, type Rng } from "../engine/index.js";
 import { fixedGame } from "../engine/test-utils.js";
-import { gameAction, PAUSE_MS, startMatch } from "../match/matchService.js";
+import { gameAction, PAUSE_MS, startMatch, timeoutTurn } from "../match/matchService.js";
 import type { MatchNode, StoredMatch } from "../match/types.js";
 import { createRoom, getActive, joinRoom, leaveRoom } from "../rooms/roomService.js";
 import type { OpenRoomEntry, RoomData } from "../rooms/types.js";
@@ -138,7 +138,6 @@ describe("jugar", () => {
     const r1 = await act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" });
     expect(r1.finished).toBe(false);
     const r2 = await act(matchId, "ana", r1.seq, { type: "REVEAL_CENTER", slot: 0 });
-    const r3 = await act(matchId, "ana", r2.seq, { type: "REVEAL_HAND", target: "ana", end: "LOW" });
 
     const node = (await matchNode(matchId))!;
     expect(node.hands!.ana).toEqual([8]);
@@ -148,8 +147,8 @@ describe("jugar", () => {
     expect(node.players.beto!.handCount).toBe(1);
     expect(node.live.center).toEqual([false, true]);
     expect((node.live.turn as { player: string }).player).toBe("beto");
-    expect((node.live.lastEvents as { type: string }[]).map((e) => e.type)).toEqual(["CARD_REVEALED", "SET_COMPLETED", "TURN_STARTED"]);
-    expect(node.live.seq).toBe(r3.seq);
+    expect((node.live.lastEvents as { type: string }[]).map((e) => e.type)).toEqual(["CARD_REVEALED", "CARD_REVEALED", "SET_COMPLETED", "TURN_STARTED"]);
+    expect(node.live.seq).toBe(r2.seq);
     expect(node.live.revealed ?? []).toEqual([]);
   });
 
@@ -236,13 +235,12 @@ describe("jugar", () => {
 
     const r1 = await act(matchId, "ana", game.seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" });
     const r2 = await act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "LOW" });
-    const r3 = await act(matchId, "ana", r2.seq, { type: "REVEAL_HAND", target: "ana", end: "LOW" });
-    expect(r3.finished).toBe(true);
+    expect(r2.finished).toBe(true);
 
     const node = (await matchNode(matchId))!;
     expect(node.meta.status).toBe("FINISHED");
     expect(node.live.result).toEqual({ winners: ["ana"], reason: "INSTANT" });
-    expect(await reasonOf(act(matchId, "beto", r3.seq, { type: "REVEAL_CENTER", slot: 0 }))).toBe("GAME_OVER");
+    expect(await reasonOf(act(matchId, "beto", r2.seq, { type: "REVEAL_CENTER", slot: 0 }))).toBe("GAME_OVER");
 
     // La sala vuelve a estar disponible para otra partida con el mismo grupo.
     const room = await read<RoomData>(env.deps, `rooms/${roomId}`);
@@ -251,6 +249,63 @@ describe("jugar", () => {
     expect((await read<OpenRoomEntry>(env.deps, `openRooms/${roomId}`))?.players).toBe(3);
     for (const uid of uids) expect(await getActive(env.deps.db, uid)).toEqual({ roomId });
     await expect(startMatch(env.deps, "ana")).resolves.toHaveProperty("matchId");
+  });
+});
+
+describe("tiempo agotado", () => {
+  const timeout = (matchId: string, uid: string, expectedSeq: number) => timeoutTurn(env.deps, uid, { matchId, expectedSeq });
+
+  it("la meta publica las reglas activas para que la app muestre solo los botones que aplican", async () => {
+    const { matchId } = await startedMatch(3);
+    expect((await matchNode(matchId))!.meta).toMatchObject({
+      setSize: 3, allowPass: false, allowClaim: true, allowSelfReveal: true, minRevealsBeforePass: 1,
+    });
+  });
+
+  it("no se puede dar por vencido un turno que todavía tiene tiempo", async () => {
+    const { matchId } = await startedMatch(3);
+    const stored = await storedOf(matchId);
+    expect(await reasonOf(timeout(matchId, "beto", stored.game.seq))).toBe("NOT_TIMED_OUT");
+    env.clock.advance(5_000);
+    expect(await reasonOf(timeout(matchId, "beto", stored.game.seq))).toBe("NOT_TIMED_OUT");
+  });
+
+  it("al vencer el tiempo, cualquier jugador avisa y el turno pasa al siguiente sin perder cartas", async () => {
+    const { matchId, uids } = await startedMatch(3);
+    const before = await storedOf(matchId);
+    const sleepy = before.game.turn.player;
+    const reporter = uids.find((u) => u !== sleepy)!;
+
+    env.clock.advance(PAUSE_MS.gameIntro + 20_000 + 1);
+    const result = await timeout(matchId, reporter, before.game.seq);
+    expect(result.finished).toBe(false);
+
+    const node = (await matchNode(matchId))!;
+    const events = node.live.lastEvents as { type: string; player: string }[];
+    expect(events.map((e) => e.type)).toEqual(["TURN_TIMEOUT", "TURN_STARTED"]);
+    expect(events[0]!.player).toBe(sleepy);
+    expect((node.live.turn as { player: string; startsAt: number }).player).not.toBe(sleepy);
+    expect((node.live.turn as { startsAt: number }).startsAt).toBe(env.clock.now + PAUSE_MS.turnFailed);
+    expect((await storedOf(matchId)).game.hands).toEqual(before.game.hands);
+  });
+
+  it("si dos jugadores avisan a la vez, el turno solo pasa una vez", async () => {
+    const { matchId, uids } = await startedMatch(3);
+    const before = await storedOf(matchId);
+    env.clock.advance(PAUSE_MS.gameIntro + 20_001);
+
+    const results = await Promise.allSettled(uids.map((u) => timeout(matchId, u, before.game.seq)));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect((await storedOf(matchId)).game.turn.number).toBe(before.game.turn.number + 1);
+  });
+
+  it("solo los jugadores de la mesa pueden avisar, y con el estado correcto", async () => {
+    const { matchId } = await startedMatch(3);
+    const stored = await storedOf(matchId);
+    env.clock.advance(PAUSE_MS.gameIntro + 20_001);
+    expect(await reasonOf(timeout(matchId, "dani", stored.game.seq))).toBe("NOT_A_PLAYER");
+    expect(await reasonOf(timeout(matchId, "ana", stored.game.seq + 3))).toBe("STALE_STATE");
+    expect(await reasonOf(timeoutTurn(env.deps, "ana", {}))).toBe("INVALID_ARGUMENT");
   });
 });
 
@@ -266,7 +321,7 @@ describe("estadísticas de Firestore", () => {
     const game = fixedGame({ hands: { ana: [7], beto: [7], carla: [7] }, center: [3], first: "ana" });
     await setGame(matchId, game);
     let seq = game.seq;
-    for (const target of ["beto", "carla", "ana"]) seq = (await act(matchId, "ana", seq, { type: "REVEAL_HAND", target, end: "LOW" })).seq;
+    for (const target of ["beto", "carla"]) seq = (await act(matchId, "ana", seq, { type: "REVEAL_HAND", target, end: "LOW" })).seq;
 
     const user = async (uid: string) => (await firestore.doc(`users/${uid}`).get()).data()!;
     expect((await user("ana")).stats.TERNA_CLASSIC).toEqual({ games: 1, wins: 1, sets: 1, sevensWins: 1, currentStreak: 1, bestStreak: 1 });
