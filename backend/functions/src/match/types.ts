@@ -35,6 +35,12 @@ export interface MatchNode {
     allowClaim: boolean;
     allowSelfReveal: boolean;
     minRevealsBeforePass: number;
+    /** Cada rival solo puede ser objetivo una vez por turno. */
+    oncePerTarget: boolean;
+    /** La carta que no coincide no se muestra: solo se avisa. */
+    hideMismatch: boolean;
+    /** Se pueden pedir varias cartas iguales de golpe. */
+    allowMultiClaim: boolean;
   };
   players: Record<string, MatchPlayerBase & { handCount: number; sets?: number[] }>;
   live: Record<string, unknown>;

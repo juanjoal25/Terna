@@ -4,6 +4,7 @@ import com.ternagames.terna.core.model.HandEnd
 import com.ternagames.terna.core.model.MatchEvent
 import com.ternagames.terna.core.model.MatchPlayer
 import com.ternagames.terna.core.model.MatchState
+import com.ternagames.terna.core.model.MismatchPick
 import com.ternagames.terna.core.model.RevealedCard
 
 /** Margen para relojes un poco desincronizados (el servidor acepta jugadas hasta 300 ms antes). */
@@ -34,15 +35,22 @@ internal object GameLogic {
         return handCount - match.revealed.count { it.owner == uid }
     }
 
-    /** Rivales a los que se les puede pedir una carta (los que aún tienen cartas ocultas). */
+    /** Rivales a los que se les puede preguntar ahora: tienen cartas ocultas y no se les preguntó ya en este turno. */
     fun otherTargets(match: MatchState, me: String): List<MatchPlayer> =
-        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 }
+        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 && it.uid !in match.asked }
+
+    /** Rivales con cartas ocultas a los que ya se les preguntó en este turno (la mesa los muestra bloqueados). */
+    fun lockedTargets(match: MatchState, me: String): List<MatchPlayer> =
+        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 && it.uid in match.asked }
 
     /** Cartas que faltan en la mesa para formar la terna. */
     fun remainingToSet(match: MatchState): Int = (match.rules.setSize - match.revealed.size).coerceAtLeast(0)
 
-    /** Máximo de cartas iguales que se le pueden pedir de una vez a `target`. */
-    fun maxClaimCount(match: MatchState, target: String): Int = minOf(remainingToSet(match), hiddenCards(match, target))
+    /** Máximo de cartas iguales que se le pueden pedir de una vez a `target` (1 si la sala no permite varias). */
+    fun maxClaimCount(match: MatchState, target: String): Int {
+        if (!match.rules.allowMultiClaim) return 1
+        return minOf(remainingToSet(match), hiddenCards(match, target)).coerceAtLeast(1)
+    }
 
     /** Jugadores a los que se les puede revelar su carta mayor o menor; incluye al propio jugador si las reglas lo permiten. */
     fun revealTargets(match: MatchState, me: String): List<MatchPlayer> {
@@ -53,7 +61,22 @@ internal object GameLogic {
 
     fun canRevealCenter(match: MatchState): Boolean = match.center.withIndex().any { (slot, hidden) -> hidden && match.revealed.none { it.slot == slot } }
 
-    fun canPass(match: MatchState): Boolean = match.rules.allowPass && match.revealed.size >= match.rules.minRevealsBeforePass
+    /** No queda nada que revelar ni pedir: el servidor deja pasar siempre, aunque la sala lo tenga apagado. */
+    fun isDeadEnd(match: MatchState, me: String): Boolean =
+        revealTargets(match, me).isEmpty() && !canRevealCenter(match) && (!match.rules.allowClaim || otherTargets(match, me).isEmpty())
+
+    fun canPass(match: MatchState, me: String): Boolean =
+        (match.rules.allowPass && match.revealed.size >= match.rules.minRevealsBeforePass) || isDeadEnd(match, me)
+
+    /** El botón "Pasar turno" se muestra si la sala lo permite o si no quedan jugadas. */
+    fun showsPass(match: MatchState, me: String): Boolean = match.rules.allowPass || isDeadEnd(match, me)
+
+    /** Por qué no se puede pasar todavía (null si se puede). */
+    fun passBlockedReason(match: MatchState, me: String): String? = when {
+        canPass(match, me) -> null
+        match.revealed.size < match.rules.minRevealsBeforePass -> "Destapa una carta para poder pasar"
+        else -> null
+    }
 
     /**
      * Extremo de mi propia mano con el que puedo cerrar la terna ("¡Hacer terna!"), o null.
@@ -77,21 +100,27 @@ internal object GameLogic {
 
     // ───────── Cartas que se muestran en la mesa ─────────
 
-    enum class TrayKind { Live, Failed, Completed }
-
-    data class Tray(val cards: List<RevealedCard>, val kind: TrayKind)
+    enum class TrayKind { Live, Failed, Passed, TimedOut, Completed }
 
     /**
-     * Cartas "en mesa". Durante la pausa que sigue a un fallo o a una terna, el servidor ya vació las
+     * `mismatch` señala la carta que no coincidía cuando la sala no la muestra: la mesa pinta una carta
+     * boca abajo marcada en rojo en su lugar, sin revelar su valor.
+     */
+    data class Tray(val cards: List<RevealedCard>, val kind: TrayKind, val mismatch: MismatchPick? = null) {
+        val isEmpty: Boolean get() = cards.isEmpty() && mismatch == null
+    }
+
+    /**
+     * Cartas "en mesa". Durante la pausa que sigue a un fallo, un pase o una terna, el servidor ya vació las
      * cartas del turno, pero todos deben alcanzar a verlas: se toman del último evento.
      */
     fun tray(match: MatchState, serverNow: Long): Tray {
         if (serverNow < match.turn.startsAt) {
             for (event in match.events.reversed()) {
                 when (event) {
-                    is MatchEvent.TurnFailed -> return Tray(event.cards, TrayKind.Failed)
-                    is MatchEvent.TurnPassed -> return Tray(event.cards, TrayKind.Failed)
-                    is MatchEvent.TurnTimeout -> return Tray(event.cards, TrayKind.Failed)
+                    is MatchEvent.TurnFailed -> return Tray(event.cards, TrayKind.Failed, event.mismatch)
+                    is MatchEvent.TurnPassed -> return Tray(event.cards, TrayKind.Passed)
+                    is MatchEvent.TurnTimeout -> return Tray(event.cards, TrayKind.TimedOut)
                     is MatchEvent.SetCompleted -> return Tray(event.cards, TrayKind.Completed)
                     else -> Unit
                 }
@@ -102,4 +131,7 @@ internal object GameLogic {
 
     /** Hueco del centro → valor que debe verse boca arriba (las cartas destapadas de ese hueco). */
     fun faceUpCenter(tray: Tray): Map<Int, Int> = tray.cards.mapNotNull { c -> c.slot?.let { it to c.value } }.toMap()
+
+    /** Número que se perseguía cuando el turno falló (el de la primera carta que sí coincidía). */
+    fun failedChase(tray: Tray): Int? = tray.cards.firstOrNull()?.value
 }

@@ -5,8 +5,8 @@ export type Rng = () => number;
 
 /**
  * PRNG determinista (mulberry32). Con la misma semilla se obtiene la misma partida,
- * lo que permite reproducir bugs reportados. En producción la semilla sale de
- * `crypto.randomInt` y se guarda en el nodo secreto de la partida.
+ * lo que permite reproducir bugs en las pruebas. Nunca se usa en producción
+ * (ver `secureRng`).
  */
 export function seededRng(seed: number): Rng {
   let a = seed >>> 0;

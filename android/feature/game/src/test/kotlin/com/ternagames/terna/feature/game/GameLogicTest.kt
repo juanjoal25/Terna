@@ -7,6 +7,7 @@ import com.ternagames.terna.core.model.MatchEvent
 import com.ternagames.terna.core.model.MatchPlayer
 import com.ternagames.terna.core.model.MatchRules
 import com.ternagames.terna.core.model.MatchState
+import com.ternagames.terna.core.model.MismatchPick
 import com.ternagames.terna.core.model.RevealedCard
 import com.ternagames.terna.core.model.TurnInfo
 import org.junit.Assert.assertEquals
@@ -27,10 +28,11 @@ class GameLogicTest {
         turnPlayer: String = "ana",
         startsAt: Long = 1_000,
         center: List<Boolean> = listOf(true, true, false),
+        asked: List<String> = emptyList(),
     ) = MatchState(
         id = "m1", roomId = "r1", ruleSet = "TERNA_CLASSIC", finished = false, turnSeconds = 20, rules = rules,
         players = listOf(player("ana", 0, myHand.size), player("beto", 1, 3), player("carla", 2, 0)),
-        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, center = center,
+        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, asked = asked, center = center,
         events = events, result = null, myHand = myHand,
     )
 
@@ -101,9 +103,62 @@ class GameLogicTest {
     @Test
     fun `pasar turno solo con la regla activa y el minimo de cartas`() {
         val reglas = MatchRules(allowPass = true, minRevealsBeforePass = 1)
-        assertFalse(GameLogic.canPass(match(rules = reglas)))
-        assertTrue(GameLogic.canPass(match(rules = reglas, revealed = listOf(fromCenter(0, 3)))))
-        assertFalse(GameLogic.canPass(match(revealed = listOf(fromCenter(0, 3)))))
+        assertFalse(GameLogic.canPass(match(rules = reglas), "ana"))
+        assertTrue(GameLogic.canPass(match(rules = reglas, revealed = listOf(fromCenter(0, 3))), "ana"))
+        assertFalse(GameLogic.canPass(match(revealed = listOf(fromCenter(0, 3))), "ana"))
+        assertEquals("Destapa una carta para poder pasar", GameLogic.passBlockedReason(match(rules = reglas), "ana"))
+    }
+
+    @Test
+    fun `si no queda ninguna jugada siempre se puede pasar, aunque la sala lo tenga apagado`() {
+        // Ana ya no tiene cartas ocultas, el centro está vacío y a Beto ya se le preguntó.
+        val atascado = match(myHand = emptyList(), center = listOf(false, false), asked = listOf("beto"))
+        assertTrue(GameLogic.isDeadEnd(atascado, "ana"))
+        assertTrue(GameLogic.canPass(atascado, "ana"))
+        assertTrue(GameLogic.showsPass(atascado, "ana"))
+        // Con jugadas disponibles y la regla apagada, ni se muestra.
+        assertFalse(GameLogic.isDeadEnd(match(), "ana"))
+        assertFalse(GameLogic.showsPass(match(), "ana"))
+    }
+
+    @Test
+    fun `a un rival al que ya se le preguntó no se le ofrece otra pregunta en el mismo turno`() {
+        val m = match(asked = listOf("beto"))
+        assertTrue(GameLogic.otherTargets(m, "ana").isEmpty())
+        assertEquals(listOf("beto"), GameLogic.lockedTargets(m, "ana").map { it.uid })
+        // Mi propia mano siempre se puede revelar.
+        assertEquals(listOf("ana"), GameLogic.revealTargets(m, "ana").map { it.uid })
+    }
+
+    @Test
+    fun `pedir varias cartas de golpe solo si la sala lo permite`() {
+        val dos = listOf(fromHand("beto", HandEnd.Low, 5))
+        assertEquals(1, GameLogic.maxClaimCount(match(revealed = dos), "beto"))
+        val multi = MatchRules(allowMultiClaim = true)
+        assertEquals(2, GameLogic.maxClaimCount(match(revealed = dos, rules = multi), "beto"))
+    }
+
+    @Test
+    fun `un fallo con carta oculta deja en la mesa solo las que coincidian y señala dónde estaba la otra`() {
+        val buenas = listOf(fromHand("beto", HandEnd.Low, 1))
+        val pick = MismatchPick(owner = null, end = null, slot = 1)
+        val m = match(events = listOf(MatchEvent.TurnFailed(5, "ana", buenas, pick), MatchEvent.TurnStarted(6, "beto", 3)), startsAt = 10_000)
+
+        val enPausa = GameLogic.tray(m, serverNow = 9_000)
+        assertEquals(GameLogic.TrayKind.Failed, enPausa.kind)
+        assertEquals(buenas, enPausa.cards)
+        assertEquals(pick, enPausa.mismatch)
+        assertEquals(1, GameLogic.failedChase(enPausa))
+        assertTrue(GameLogic.faceUpCenter(enPausa).isEmpty()) // el hueco 1 sigue boca abajo: nadie ve su valor
+    }
+
+    @Test
+    fun `pasar y tiempo agotado se distinguen en la bandeja`() {
+        val cartas = listOf(fromCenter(0, 4))
+        val pasar = match(events = listOf(MatchEvent.TurnPassed(5, "ana", cartas), MatchEvent.TurnStarted(6, "beto", 3)), startsAt = 10_000)
+        assertEquals(GameLogic.TrayKind.Passed, GameLogic.tray(pasar, 9_000).kind)
+        val tiempo = match(events = listOf(MatchEvent.TurnTimeout(5, "ana", cartas), MatchEvent.TurnStarted(6, "beto", 3)), startsAt = 10_000)
+        assertEquals(GameLogic.TrayKind.TimedOut, GameLogic.tray(tiempo, 9_000).kind)
     }
 
     @Test

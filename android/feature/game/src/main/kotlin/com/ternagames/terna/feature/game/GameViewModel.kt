@@ -15,6 +15,7 @@ import com.ternagames.terna.core.model.GameAction
 import com.ternagames.terna.core.model.HandEnd
 import com.ternagames.terna.core.model.MatchEvent
 import com.ternagames.terna.core.model.MatchState
+import com.ternagames.terna.core.model.MismatchPick
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,13 +40,16 @@ sealed interface GameDialog {
     /** Elegir si se revela la carta mayor o la menor de `target`. */
     data class PickEnd(val target: String) : GameDialog
 
-    /** Elegir qué número se pide (cuando todavía no se destapó nada). */
-    data object PickNumber : GameDialog
+    /** Lo que se puede hacer con un rival al tocarlo en la mesa: revelar su menor/mayor o pedirle un número. */
+    data class RivalMenu(val target: String) : GameDialog
+
+    /** Elegir qué número se pide (cuando todavía no se destapó nada). Con `target`, ya se sabe a quién. */
+    data class PickNumber(val target: String? = null) : GameDialog
 
     /** Elegir a quién se le pide el número `value`. */
     data class PickClaimTarget(val value: Int) : GameDialog
 
-    /** Elegir cuántas cartas iguales se le piden a `target` de una sola vez. */
+    /** Elegir cuántas cartas iguales se le piden a `target` de una sola vez (solo si la sala lo permite). */
     data class PickClaimCount(val target: String, val value: Int) : GameDialog
 }
 
@@ -64,6 +68,8 @@ data class GameUiState(
     val selectingCenter: Boolean = false,
     val banner: Banner? = null,
     val soundEffect: Pair<Long, TernaSfx>? = null,
+    /** Sube cada vez que el turno pasa a ser mío: la pantalla muestra "¡Tu turno!" y vibra. */
+    val myTurnAlert: Long = 0,
     val message: String? = null,
     val exit: GameExit? = null,
     /** La partida no existe o ya no se puede ver. */
@@ -90,6 +96,7 @@ class GameViewModel @Inject constructor(
     private var lastSeenSeq = -1L
     private var bannerCounter = 0L
     private var sfxCounter = 0L
+    private var alertCounter = 0L
     private var reportedTimeoutSeq = -1L
 
     init {
@@ -129,13 +136,15 @@ class GameViewModel @Inject constructor(
 
         // Si el turno cambió, se cierra lo que el jugador tuviera a medias.
         _state.update { s ->
-            val turnChanged = s.match?.turn?.let { it.player != match.turn.player || it.number != match.turn.number } ?: false
+            val turnChanged = s.match?.turn?.let { it.player != match.turn.player || it.number != match.turn.number } ?: true
+            val myTurnStarted = turnChanged && !match.finished && match.turn.player == myUid
             s.copy(
                 match = match,
                 busy = false,
                 dialog = if (turnChanged || match.finished) null else s.dialog,
                 selectingCenter = if (turnChanged || match.finished) false else s.selectingCenter,
                 soundEffect = sfx?.let { (++sfxCounter) to it } ?: s.soundEffect,
+                myTurnAlert = if (myTurnStarted) ++alertCounter else s.myTurnAlert,
             )
         }
         bannerFor(fresh, match)?.let(::showBanner)
@@ -161,26 +170,42 @@ class GameViewModel @Inject constructor(
         }
         events.filterIsInstance<MatchEvent.ClaimFailed>().lastOrNull()?.let {
             val target = match.nameOf(it.target)
+            val endsTurn = events.any { e -> e is MatchEvent.TurnFailed }
             return if (mine(it.player)) {
-                "¡Error! $target no tiene el ${it.value}. -1000 de aura. Pierdes tu turno." to BannerTone.Error
+                "¡No es la carta correcta! $target no tiene el ${it.value} como carta menor ni mayor. -1000 de aura." + (if (endsTurn) " Pierdes tu turno." else "") to BannerTone.Error
             } else {
-                "${match.nameOf(it.player)} pidió el ${it.value} a ${if (mine(it.target)) "ti" else target} y falló: ¡-1000 de aura!" to BannerTone.Error
+                "${match.nameOf(it.player)} pidió el ${it.value} a ${if (mine(it.target)) "ti" else target}: no lo tiene como menor ni mayor. ¡-1000 de aura!" to BannerTone.Error
             }
         }
         events.filterIsInstance<MatchEvent.TurnTimeout>().lastOrNull()?.let {
             return (if (mine(it.player)) "Se acabó tu tiempo. Pierdes el turno." else "Se acabó el tiempo de ${match.nameOf(it.player)}.") to BannerTone.Info
         }
         events.filterIsInstance<MatchEvent.TurnFailed>().lastOrNull()?.let {
-            return (if (mine(it.player)) "¡No coincide! Pierdes tu turno." else "${match.nameOf(it.player)} falló. Pasa el turno.") to BannerTone.Error
+            val chase = it.cards.firstOrNull()?.value
+            val pick = it.mismatch
+            return if (pick != null && chase != null) {
+                val where = whereOf(pick, match)
+                (if (mine(it.player)) "No es la carta correcta: $where no era el $chase. Pierdes tu turno." else "${match.nameOf(it.player)} falló: $where no era el $chase.") to BannerTone.Error
+            } else {
+                (if (mine(it.player)) "¡No coincide! Pierdes tu turno." else "${match.nameOf(it.player)} falló. Pasa el turno.") to BannerTone.Error
+            }
         }
         events.filterIsInstance<MatchEvent.TurnPassed>().lastOrNull()?.let {
-            return "${who(it.player)} pasó el turno." to BannerTone.Info
+            return (if (mine(it.player)) "Pasaste el turno." else "${who(it.player)} pasó el turno.") to BannerTone.Info
         }
         events.filterIsInstance<MatchEvent.CardRevealed>().lastOrNull { it.card.claimed }?.let {
             val owner = it.card.owner?.let(match::nameOf).orEmpty()
             return (if (mine(it.player)) "¡Éxito! $owner sí tiene esa carta." else "${match.nameOf(it.player)} acertó: $owner tenía un ${it.card.value}.") to BannerTone.Success
         }
         return null
+    }
+
+    /** "la carta menor de Ana", "tu carta mayor", "la carta del centro": sin decir cuál era su valor. */
+    private fun whereOf(pick: MismatchPick, match: MatchState): String {
+        if (pick.fromCenter) return "la carta del centro"
+        val end = if (pick.end == HandEnd.High) "mayor" else "menor"
+        val owner = pick.owner.orEmpty()
+        return if (owner == myUid) "tu carta $end" else "la carta $end de ${match.nameOf(owner)}"
     }
 
     // ───────────── Tiempo agotado ─────────────
@@ -221,10 +246,30 @@ class GameViewModel @Inject constructor(
     fun claim() {
         val match = _state.value.match ?: return
         val chase = GameLogic.chaseValue(match)
-        _state.update { it.copy(dialog = if (chase != null) GameDialog.PickClaimTarget(chase) else GameDialog.PickNumber, selectingCenter = false) }
+        _state.update { it.copy(dialog = if (chase != null) GameDialog.PickClaimTarget(chase) else GameDialog.PickNumber(), selectingCenter = false) }
     }
 
-    fun onNumberPicked(value: Int) = _state.update { it.copy(dialog = GameDialog.PickClaimTarget(value)) }
+    /** Tocar a un rival en la mesa: abre lo que se puede hacer con él (o explica por qué no). */
+    fun onRivalTapped(uid: String) {
+        val s = _state.value
+        val match = s.match ?: return
+        if (!s.canAct || uid == myUid) return
+        val rival = match.player(uid) ?: return
+        when {
+            GameLogic.otherTargets(match, myUid).any { it.uid == uid } ->
+                _state.update { it.copy(dialog = GameDialog.RivalMenu(uid), selectingCenter = false) }
+            uid in match.asked -> _state.update { it.copy(message = "Ya le preguntaste a ${rival.name} en este turno.") }
+            else -> _state.update { it.copy(message = "${rival.name} no tiene cartas ocultas.") }
+        }
+    }
+
+    /** Desde el menú de un rival: pedirle un número cuando todavía no se persigue ninguno. */
+    fun pickNumberFor(target: String) = _state.update { it.copy(dialog = GameDialog.PickNumber(target)) }
+
+    fun onNumberPicked(value: Int) {
+        val target = (_state.value.dialog as? GameDialog.PickNumber)?.target
+        if (target != null) onClaimTargetPicked(target, value) else _state.update { it.copy(dialog = GameDialog.PickClaimTarget(value)) }
+    }
 
     fun onRevealTargetPicked(uid: String) = _state.update { it.copy(dialog = GameDialog.PickEnd(uid)) }
 
@@ -232,7 +277,7 @@ class GameViewModel @Inject constructor(
 
     fun onClaimTargetPicked(target: String, value: Int) {
         val match = _state.value.match ?: return
-        // Si caben varias cartas iguales, se pregunta cuántas; si no, se pide una directamente.
+        // Si la sala permite varias iguales de golpe y caben, se pregunta cuántas; si no, se pide una directamente.
         if (GameLogic.maxClaimCount(match, target) >= 2) {
             _state.update { it.copy(dialog = GameDialog.PickClaimCount(target, value)) }
         } else {
@@ -291,7 +336,7 @@ class GameViewModel @Inject constructor(
     companion object {
         private const val TAG = "Game"
         private const val TICK_MS = 250L
-        private const val BANNER_MS = 3_200L
+        private const val BANNER_MS = 3_600L
         private const val LUCKY_NUMBER = 7
         private const val TIMEOUT_GRACE_MS = 1_000L
         private const val TIMEOUT_STAGGER_MS = 700L

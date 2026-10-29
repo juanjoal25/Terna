@@ -20,16 +20,25 @@ export const ORIGINAL_OPTIONS: TurnOptions = {
   allowPass: false,
   minRevealsBeforePass: 1,
   continueAfterSet: false,
+  oncePerTarget: false,
+  hideMismatch: false,
+  allowMultiClaim: false,
 };
 
 /**
- * Reglas de TERNA!: como el original, más "deducir" (pedir un número que esté en
- * la menor o la mayor de otro jugador). Pasar turno queda apagado por defecto
- * porque permite espiar cartas sin riesgo; el anfitrión puede encenderlo.
+ * Reglas de TERNA!: como el original, más "deducir" (pedir un número que esté en la menor o la
+ * mayor de otro jugador), y pensadas para que no se regale información:
+ *  - la carta que no coincide no se muestra, solo se avisa de que no era la correcta;
+ *  - a cada rival se le puede preguntar una sola vez por turno (nada de sacar dos cartas iguales de golpe);
+ *  - se puede pasar el turno tras destapar al menos una carta.
+ * Cada una es una opción: el anfitrión puede apagarla.
  */
 export const TERNA_OPTIONS: TurnOptions = {
   ...ORIGINAL_OPTIONS,
   allowClaim: true,
+  allowPass: true,
+  oncePerTarget: true,
+  hideMismatch: true,
 };
 
 const BASE = {
@@ -91,6 +100,8 @@ export function validateRuleSet(ruleSet: RuleSet): void {
     if (v < 1 || v > ruleSet.maxNumber) fail(`instantWinValue ${v} fuera de rango`);
   }
   if (ruleSet.options.minRevealsBeforePass < 0) fail("minRevealsBeforePass negativo");
+  // Con sets de 4+, dos rivales con dos copias cada uno bloquearían la partida: nadie podría juntar el set.
+  if (ruleSet.options.oncePerTarget && ruleSet.setSize > 3) fail("oncePerTarget solo es posible con ternas (setSize 3)");
 
   const counts = Object.keys(ruleSet.deal).map(Number).sort((a, b) => a - b);
   if (counts.length === 0) fail("deal vacío");

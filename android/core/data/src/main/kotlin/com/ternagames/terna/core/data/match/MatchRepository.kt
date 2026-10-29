@@ -14,6 +14,7 @@ import com.ternagames.terna.core.model.MatchEvent
 import com.ternagames.terna.core.model.MatchPlayer
 import com.ternagames.terna.core.model.MatchRules
 import com.ternagames.terna.core.model.MatchState
+import com.ternagames.terna.core.model.MismatchPick
 import com.ternagames.terna.core.model.RevealedCard
 import com.ternagames.terna.core.model.TurnInfo
 import kotlinx.coroutines.channels.awaitClose
@@ -138,6 +139,12 @@ private fun DataSnapshot.toCard(): RevealedCard = RevealedCard(
     claimed = flag("claimed", false),
 )
 
+private fun DataSnapshot.toMismatch(): MismatchPick = MismatchPick(
+    owner = child("owner").getValue(String::class.java),
+    end = str("end").toEnd(),
+    slot = child("slot").getValue(Long::class.java)?.toInt(),
+)
+
 private fun DataSnapshot.cards(key: String): List<RevealedCard> = child(key).children.map { it.toCard() }
 
 private fun DataSnapshot.toResult(): GameResult? =
@@ -150,7 +157,7 @@ private fun DataSnapshot.toEvent(): MatchEvent? {
         "TURN_STARTED" -> MatchEvent.TurnStarted(seq, player, num("number").toInt())
         "CARD_REVEALED" -> MatchEvent.CardRevealed(seq, player, child("reveal").toCard())
         "CLAIM_FAILED" -> MatchEvent.ClaimFailed(seq, player, str("target"), num("value").toInt())
-        "TURN_FAILED" -> MatchEvent.TurnFailed(seq, player, cards("revealed"))
+        "TURN_FAILED" -> MatchEvent.TurnFailed(seq, player, cards("revealed"), child("mismatch").takeIf { it.exists() }?.toMismatch())
         "TURN_PASSED" -> MatchEvent.TurnPassed(seq, player, cards("revealed"))
         "TURN_TIMEOUT" -> MatchEvent.TurnTimeout(seq, player, cards("revealed"))
         "SET_COMPLETED" -> MatchEvent.SetCompleted(seq, player, num("value").toInt(), cards("cards"))
@@ -174,6 +181,9 @@ private fun parseMatch(matchId: String, meta: DataSnapshot, players: DataSnapsho
             allowClaim = meta.flag("allowClaim", true),
             allowSelfReveal = meta.flag("allowSelfReveal", true),
             minRevealsBeforePass = meta.num("minRevealsBeforePass").toInt(),
+            oncePerTarget = meta.flag("oncePerTarget", false),
+            allowMultiClaim = meta.flag("allowMultiClaim", false),
+            hideMismatch = meta.flag("hideMismatch", false),
         ),
         players = players.children.map {
             MatchPlayer(
@@ -190,6 +200,7 @@ private fun parseMatch(matchId: String, meta: DataSnapshot, players: DataSnapsho
         seq = live.num("seq"),
         turn = TurnInfo(turn.str("player"), turn.num("number").toInt(), turn.num("startsAt"), turn.num("deadline")),
         revealed = live.cards("revealed"),
+        asked = live.child("asked").children.mapNotNull { it.getValue(String::class.java) },
         center = live.child("center").children.map { it.getValue(Boolean::class.java) ?: false },
         events = live.child("lastEvents").children.mapNotNull { it.toEvent() },
         result = live.child("result").toResult(),

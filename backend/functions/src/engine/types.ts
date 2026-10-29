@@ -47,6 +47,12 @@ export interface TurnOptions {
   minRevealsBeforePass: number;
   /** Si es true, tras completar un set el mismo jugador sigue jugando. */
   continueAfterSet: boolean;
+  /** Cada rival solo puede ser objetivo una vez por turno (revelarle o pedirle una carta). Tu propia mano no cuenta. */
+  oncePerTarget: boolean;
+  /** Si es true, la carta que no coincide NO se muestra: solo se avisa de que no era la correcta. */
+  hideMismatch: boolean;
+  /** Permite pedir varias cartas iguales de una vez a un rival (`count` > 1 en CLAIM). */
+  allowMultiClaim: boolean;
 }
 
 export interface RuleSet {
@@ -82,7 +88,12 @@ export interface TurnState {
   player: PlayerId;
   number: number;
   revealed: Reveal[];
+  /** Rivales a los que ya se les pidió o reveló algo en este turno (solo con `oncePerTarget`). */
+  asked?: PlayerId[];
 }
+
+/** Dónde estaba la carta que no coincidía. Nunca incluye su valor: no se muestra a nadie. */
+export type MismatchPick = { source: "HAND"; owner: PlayerId; end: HandEnd } | { source: "CENTER"; slot: number };
 
 export type WinReason = "INSTANT" | "SETS" | "LINKED" | "EXHAUSTED";
 
@@ -121,7 +132,8 @@ type EventBody =
   | { type: "TURN_STARTED"; player: PlayerId; number: number }
   | { type: "CARD_REVEALED"; player: PlayerId; reveal: Reveal }
   | { type: "CLAIM_FAILED"; player: PlayerId; target: PlayerId; value: Card; taunt: "AURA_MINUS_1000" }
-  | { type: "TURN_FAILED"; player: PlayerId; revealed: Reveal[] }
+  /** `revealed` son las cartas que sí coincidían; con `hideMismatch`, `mismatch` señala la que no (sin valor). */
+  | { type: "TURN_FAILED"; player: PlayerId; revealed: Reveal[]; mismatch?: MismatchPick }
   | { type: "TURN_PASSED"; player: PlayerId; revealed: Reveal[] }
   | { type: "TURN_TIMEOUT"; player: PlayerId; revealed: Reveal[] }
   | { type: "SET_COMPLETED"; player: PlayerId; value: Card; cards: Reveal[] }
@@ -146,6 +158,7 @@ export type EngineErrorCode =
   | "CLAIM_VALUE_MISMATCH"
   | "INVALID_VALUE"
   | "INVALID_COUNT"
+  | "TARGET_ALREADY_USED"
   | "PASS_DISABLED"
   | "PASS_TOO_EARLY";
 

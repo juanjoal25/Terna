@@ -11,6 +11,8 @@ import type { Action, GameState, RuleSet } from "./types.js";
 const CUARTA_DRAFT: RuleSet = {
   ...TERNA_CLASSIC,
   id: "CUARTA_DRAFT",
+  // "Una vez por rival" no es compatible con sets de 4 (ver validateRuleSet).
+  options: { ...TERNA_CLASSIC.options, oncePerTarget: false },
   copies: 4,
   setSize: 4,
   deal: {
@@ -86,6 +88,8 @@ describe("simulación de partidas aleatorias", () => {
     [TERNA_CLASSIC, 6],
     [TERNA_SPICY, 4],
     [TRIO_ORIGINAL, 5],
+    [withOptions(TERNA_CLASSIC, { allowPass: false }), 4], // sin pasar: solo la salida de emergencia evita bloqueos
+    [withOptions(TERNA_CLASSIC, { oncePerTarget: false, hideMismatch: false, allowMultiClaim: true }), 5],
     [withOptions(TERNA_CLASSIC, { allowPass: true, claimFailEndsTurn: false, continueAfterSet: true }), 4],
     [CUARTA_DRAFT, 3],
     [CUARTA_DRAFT, 6],

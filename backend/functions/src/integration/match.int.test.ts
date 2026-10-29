@@ -152,15 +152,18 @@ describe("jugar", () => {
     expect(node.live.revealed ?? []).toEqual([]);
   });
 
-  it("un fallo muestra las cartas a todos y obliga a esperar la pausa antes de que juegue el siguiente", async () => {
+  it("un fallo avisa a todos sin mostrar la carta equivocada y obliga a esperar la pausa antes de que juegue el siguiente", async () => {
     const { matchId, seq } = await scripted();
     const r1 = await act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" });
     const r2 = await act(matchId, "ana", r1.seq, { type: "REVEAL_CENTER", slot: 1 }); // un 2: no coincide
 
     const node = (await matchNode(matchId))!;
-    const events = node.live.lastEvents as { type: string; revealed?: { value: number }[] }[];
-    expect(events.map((e) => e.type)).toEqual(["CARD_REVEALED", "TURN_FAILED", "TURN_STARTED"]);
-    expect(events[1]!.revealed!.map((c) => c.value)).toEqual([1, 2]);
+    const events = node.live.lastEvents as { type: string; revealed?: { value: number }[]; mismatch?: unknown }[];
+    expect(events.map((e) => e.type)).toEqual(["TURN_FAILED", "TURN_STARTED"]); // la carta equivocada no genera CARD_REVEALED
+    // Solo se ve la carta que sí coincidía (el 1 de beto); la del centro que no coincidía (un 2) no se publica.
+    expect(events[0]!.revealed!.map((c) => c.value)).toEqual([1]);
+    expect(events[0]!.mismatch).toEqual({ source: "CENTER", slot: 1 });
+    expect(JSON.stringify(node.live)).not.toContain('"value":2');
     expect(node.hands!.beto).toEqual([1, 9]); // las cartas volvieron a su sitio
     expect((node.live.turn as { player: string; startsAt: number }).player).toBe("beto");
     expect((node.live.turn as { startsAt: number }).startsAt).toBe(env.clock.now + PAUSE_MS.turnFailed);
@@ -180,6 +183,14 @@ describe("jugar", () => {
     expect(events[0]).toMatchObject({ taunt: "AURA_MINUS_1000", target: "carla", value: 5 });
   });
 
+  it("a cada rival se le pregunta una sola vez por turno, y el aviso llega a todos en `live.asked`", async () => {
+    const { matchId, seq } = await scripted();
+    const r1 = await act(matchId, "ana", seq, { type: "CLAIM", target: "carla", value: 4 });
+    expect((await matchNode(matchId))!.live.asked).toEqual(["carla"]);
+    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "HIGH" }))).toBe("TARGET_ALREADY_USED");
+    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "CLAIM", target: "carla", value: 4, count: 2 }))).toBe("TARGET_ALREADY_USED");
+  });
+
   it("deducir bien entrega la carta y sigue el turno", async () => {
     const { matchId, seq } = await scripted();
     await act(matchId, "ana", seq, { type: "CLAIM", target: "carla", value: 4 });
@@ -197,7 +208,7 @@ describe("jugar", () => {
     expect(await reasonOf(act(matchId, "ana", seq + 5, { type: "REVEAL_CENTER", slot: 0 }))).toBe("STALE_STATE");
     expect(await reasonOf(act(matchId, "ana", seq, { type: "REVEAL_CENTER", slot: 9 }))).toBe("INVALID_SLOT");
     expect(await reasonOf(act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "nadie", end: "LOW" }))).toBe("UNKNOWN_PLAYER");
-    expect(await reasonOf(act(matchId, "ana", seq, { type: "PASS" }))).toBe("PASS_DISABLED");
+    expect(await reasonOf(act(matchId, "ana", seq, { type: "PASS" }))).toBe("PASS_TOO_EARLY");
     expect(await reasonOf(act(matchId, "ana", seq, { type: "HACER_TRAMPA" }))).toBe("INVALID_ACTION");
     expect(await reasonOf(act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "beto", end: "MEDIO" }))).toBe("INVALID_ACTION");
     expect(await reasonOf(act("no-existe", "ana", seq, { type: "PASS" }))).toBe("MATCH_NOT_FOUND");
@@ -258,7 +269,8 @@ describe("tiempo agotado", () => {
   it("la meta publica las reglas activas para que la app muestre solo los botones que aplican", async () => {
     const { matchId } = await startedMatch(3);
     expect((await matchNode(matchId))!.meta).toMatchObject({
-      setSize: 3, allowPass: false, allowClaim: true, allowSelfReveal: true, minRevealsBeforePass: 1,
+      setSize: 3, allowPass: true, allowClaim: true, allowSelfReveal: true, minRevealsBeforePass: 1,
+      oncePerTarget: true, hideMismatch: true, allowMultiClaim: false,
     });
   });
 
@@ -364,6 +376,7 @@ function chooseAction(state: GameState, rng: Rng): Action {
   const choices: Action[] = [];
   for (const target of actions.revealTargets) for (const end of ["LOW", "HIGH"] as const) choices.push({ type: "REVEAL_HAND", player, target, end });
   for (const slot of actions.centerSlots) choices.push({ type: "REVEAL_CENTER", player, slot });
+  if (choices.length === 0) return { type: "PASS", player };
   return choices[Math.floor(rng() * choices.length)]!;
 }
 

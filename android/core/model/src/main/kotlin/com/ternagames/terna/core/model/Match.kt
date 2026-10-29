@@ -15,6 +15,11 @@ data class RevealedCard(
     val fromCenter: Boolean get() = slot != null
 }
 
+/** Dónde estaba la carta que no coincidía. Su valor no se publica: nadie la ve. */
+data class MismatchPick(val owner: String?, val end: HandEnd?, val slot: Int?) {
+    val fromCenter: Boolean get() = slot != null
+}
+
 data class GameResult(
     val winners: List<String>,
     /** SETS | INSTANT | LINKED | EXHAUSTED */
@@ -40,6 +45,12 @@ data class MatchRules(
     val allowClaim: Boolean = true,
     val allowSelfReveal: Boolean = true,
     val minRevealsBeforePass: Int = 1,
+    /** Cada rival solo puede ser objetivo una vez por turno. */
+    val oncePerTarget: Boolean = false,
+    /** Se pueden pedir varias cartas iguales de golpe. */
+    val allowMultiClaim: Boolean = false,
+    /** La carta que no coincide no se muestra: solo se avisa. */
+    val hideMismatch: Boolean = false,
 )
 
 data class TurnInfo(
@@ -59,7 +70,8 @@ sealed interface MatchEvent {
 
     /** Pidió una carta que el otro no tiene en un extremo: "-1000 de aura". */
     data class ClaimFailed(override val seq: Long, val player: String, val target: String, val value: Int) : MatchEvent
-    data class TurnFailed(override val seq: Long, val player: String, val cards: List<RevealedCard>) : MatchEvent
+    /** `cards` son las que sí coincidían; con `hideMismatch`, `mismatch` señala dónde estaba la que no (sin valor). */
+    data class TurnFailed(override val seq: Long, val player: String, val cards: List<RevealedCard>, val mismatch: MismatchPick? = null) : MatchEvent
     data class TurnPassed(override val seq: Long, val player: String, val cards: List<RevealedCard>) : MatchEvent
     data class TurnTimeout(override val seq: Long, val player: String, val cards: List<RevealedCard>) : MatchEvent
     data class SetCompleted(override val seq: Long, val player: String, val value: Int, val cards: List<RevealedCard>) : MatchEvent
@@ -80,6 +92,8 @@ data class MatchState(
     val turn: TurnInfo,
     /** Cartas destapadas en el turno actual. */
     val revealed: List<RevealedCard>,
+    /** Rivales a los que ya se les preguntó en este turno (solo con `oncePerTarget`). */
+    val asked: List<String> = emptyList(),
     /** `true` = hay una carta boca abajo en ese hueco del centro. */
     val center: List<Boolean>,
     /** Eventos de la última jugada. */

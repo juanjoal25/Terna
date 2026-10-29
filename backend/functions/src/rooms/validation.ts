@@ -17,7 +17,7 @@ export function ruleSetOrThrow(id: string): RuleSet {
   return ruleSet;
 }
 
-const BOOLEAN_OPTIONS = ["allowSelfReveal", "allowClaim", "claimRequiresEnd", "claimFailEndsTurn", "allowPass", "continueAfterSet"] as const;
+const BOOLEAN_OPTIONS = ["allowSelfReveal", "allowClaim", "claimRequiresEnd", "claimFailEndsTurn", "allowPass", "continueAfterSet", "oncePerTarget", "hideMismatch", "allowMultiClaim"] as const;
 
 /** Acepta solo las opciones conocidas, con su tipo correcto. Lo demás se ignora. */
 export function parseOptions(raw: unknown): Partial<TurnOptions> {

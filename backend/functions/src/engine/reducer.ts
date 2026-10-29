@@ -1,4 +1,4 @@
-import { currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, ownCardsToComplete, planHandCards } from "./queries.js";
+import { askedTargets, canAsk, currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, isDeadEnd, ownCardsToComplete, planHandCards } from "./queries.js";
 import type {
   Action,
   ApplyResult,
@@ -9,6 +9,7 @@ import type {
   GameResult,
   GameState,
   HandEnd,
+  MismatchPick,
   PlayerId,
   Reveal,
 } from "./types.js";
@@ -76,6 +77,8 @@ function revealHand(state: GameState, out: Emitter, target: PlayerId, end: HandE
   }
   const index = hiddenEndIndex(state, target, end);
   if (index === null) return "NO_HIDDEN_CARDS";
+  if (!canAsk(state, target)) return "TARGET_ALREADY_USED";
+  markAsked(state, target);
 
   const value = state.hands[target]![index]!;
   resolveReveal(state, out, { source: "HAND", owner: target, index, end, value, claimed: false });
@@ -104,6 +107,7 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
   if (!Number.isInteger(value) || value < 1 || value > maxNumber) return "INVALID_VALUE";
   if (options.claimRequiresEnd && !end) return "CLAIM_END_REQUIRED";
   if (!hasHiddenCards(state, target)) return "NO_HIDDEN_CARDS";
+  if (!canAsk(state, target)) return "TARGET_ALREADY_USED";
 
   // Si ya se está persiguiendo un número, deducir otro no tiene sentido: se rechaza sin penalizar.
   const chasing = currentTurnValue(state);
@@ -112,6 +116,9 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
   if (!Number.isInteger(count) || count < 1 || count > setSize - state.turn.revealed.length || count > hiddenCount(state, target)) {
     return "INVALID_COUNT";
   }
+  // Sin "varias de golpe", cada petición saca una sola carta: las demás hay que descubrirlas después.
+  if (count > 1 && !options.allowMultiClaim) return "INVALID_COUNT";
+  markAsked(state, target);
 
   const picks = planHandCards(state, target, value, count, end);
   if (picks) {
@@ -140,8 +147,11 @@ function completeWithOwnHand(state: GameState, out: Emitter): void {
 
 function pass(state: GameState, out: Emitter): EngineErrorCode | null {
   const { options } = state.ruleSet;
-  if (!options.allowPass) return "PASS_DISABLED";
-  if (state.turn.revealed.length < options.minRevealsBeforePass) return "PASS_TOO_EARLY";
+  // Si ya no queda nada que revelar ni pedir, siempre se puede pasar: el turno nunca se bloquea.
+  if (!isDeadEnd(state)) {
+    if (!options.allowPass) return "PASS_DISABLED";
+    if (state.turn.revealed.length < options.minRevealsBeforePass) return "PASS_TOO_EARLY";
+  }
 
   out.emit({ type: "TURN_PASSED", player: state.turn.player, revealed: state.turn.revealed });
   endTurn(state, out);
@@ -152,10 +162,19 @@ function pass(state: GameState, out: Emitter): EngineErrorCode | null {
 function resolveReveal(state: GameState, out: Emitter, reveal: Reveal): void {
   const player = state.turn.player;
   const chasing = currentTurnValue(state);
+  const mismatch = chasing !== null && reveal.value !== chasing;
+
+  if (mismatch && state.ruleSet.options.hideMismatch) {
+    // La carta no se muestra a nadie (tampoco se guarda): solo se avisa de dónde estaba y que no era la correcta.
+    out.emit({ type: "TURN_FAILED", player, revealed: state.turn.revealed, mismatch: toMismatchPick(reveal) });
+    endTurn(state, out);
+    return;
+  }
+
   state.turn.revealed.push(reveal);
   out.emit({ type: "CARD_REVEALED", player, reveal });
 
-  if (chasing !== null && reveal.value !== chasing) {
+  if (mismatch) {
     // Las cartas reveladas "vuelven a su sitio": como nunca se movieron, basta con olvidarlas.
     out.emit({ type: "TURN_FAILED", player, revealed: state.turn.revealed });
     endTurn(state, out);
@@ -163,6 +182,16 @@ function resolveReveal(state: GameState, out: Emitter, reveal: Reveal): void {
   }
 
   if (state.turn.revealed.length === state.ruleSet.setSize) completeSet(state, out);
+}
+
+function toMismatchPick(reveal: Reveal): MismatchPick {
+  return reveal.source === "HAND" ? { source: "HAND", owner: reveal.owner, end: reveal.end } : { source: "CENTER", slot: reveal.slot };
+}
+
+/** Apunta que a `target` ya se le preguntó en este turno (solo cuenta con la opción `oncePerTarget`). */
+function markAsked(state: GameState, target: PlayerId): void {
+  if (!state.ruleSet.options.oncePerTarget || target === state.turn.player) return;
+  state.turn.asked = [...askedTargets(state), target];
 }
 
 function completeSet(state: GameState, out: Emitter): void {
@@ -182,6 +211,7 @@ function completeSet(state: GameState, out: Emitter): void {
 
   state.sets[player]!.push(value);
   state.turn.revealed = [];
+  delete state.turn.asked;
   out.emit({ type: "SET_COMPLETED", player, value, cards });
 
   const reason = winReasonAfterSet(state.ruleSet, state.sets[player]!, value);

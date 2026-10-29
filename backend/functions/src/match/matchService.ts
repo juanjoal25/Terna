@@ -43,6 +43,7 @@ function projectNode(stored: StoredMatch, base: Record<string, MatchPlayerBase>,
       seq: game.seq,
       turn: { player: game.turn.player, number: game.turn.number, startsAt: stored.timing.startsAt, deadline: stored.timing.deadline },
       revealed: view.turn.revealed,
+      asked: view.turn.asked,
       center: view.center,
       lastEvents: events.map(toPublicEvent),
       ...(game.result ? { result: game.result } : {}),
@@ -113,6 +114,9 @@ export async function startMatch(deps: Deps, uid: string): Promise<{ matchId: st
       allowClaim: ruleSet.options.allowClaim,
       allowSelfReveal: ruleSet.options.allowSelfReveal,
       minRevealsBeforePass: ruleSet.options.minRevealsBeforePass,
+      oncePerTarget: ruleSet.options.oncePerTarget,
+      hideMismatch: ruleSet.options.hideMismatch,
+      allowMultiClaim: ruleSet.options.allowMultiClaim,
     };
 
     await db.ref().update(

@@ -1,6 +1,6 @@
 import type { Card, GameEvent, GameResult, GameState, HandEnd, PlayerId, Reveal } from "./types.js";
 
-/** Lo que cualquiera en la mesa puede ver. Es lo único que se publica en `/matches/{id}/public`. */
+/** Lo que cualquiera en la mesa puede ver. Es lo que se publica en `matches/{id}/live`. */
 export type PublicReveal =
   | { source: "HAND"; owner: PlayerId; end: HandEnd; value: Card; claimed: boolean }
   | { source: "CENTER"; slot: number; value: Card };
@@ -16,7 +16,7 @@ export interface PublicView {
   players: PublicPlayer[];
   /** true = el hueco tiene una carta boca abajo. Nunca se publica su valor. */
   center: boolean[];
-  turn: { player: PlayerId; number: number; revealed: PublicReveal[] };
+  turn: { player: PlayerId; number: number; revealed: PublicReveal[]; asked: PlayerId[] };
   status: GameState["status"];
   result: GameResult | null;
   seq: number;
@@ -34,7 +34,7 @@ export function publicView(state: GameState): PublicView {
     ruleSetId: state.ruleSet.id,
     players: state.players.map((id) => ({ id, handCount: state.hands[id]!.length, sets: [...state.sets[id]!] })),
     center: state.center.map((c) => c !== null),
-    turn: { player: state.turn.player, number: state.turn.number, revealed: state.turn.revealed.map(toPublicReveal) },
+    turn: { player: state.turn.player, number: state.turn.number, revealed: state.turn.revealed.map(toPublicReveal), asked: [...(state.turn.asked ?? [])] },
     status: state.status,
     result: state.result,
     seq: state.seq,

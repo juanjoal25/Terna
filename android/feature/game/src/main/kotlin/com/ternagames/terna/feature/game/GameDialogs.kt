@@ -72,6 +72,7 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
             val target = if (dialog.target == me) "ti" else match.nameOf(dialog.target)
             Text("Preguntando a $target…", style = MaterialTheme.typography.labelSmall, color = TernaColors.TextMuted)
             Header("¿Qué carta deseas revelar?", actions.onDismissDialog)
+            MismatchNote(match)
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TernaPrimaryButton("CARTA MAYOR", { actions.onEnd(dialog.target, HandEnd.High) }, Modifier.weight(1f))
@@ -79,8 +80,34 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
             }
         }
 
-        GameDialog.PickNumber -> TernaDialog(onDismiss = actions.onDismissDialog) {
-            Header("¿Qué número pides?", actions.onDismissDialog)
+        is GameDialog.RivalMenu -> TernaDialog(onDismiss = actions.onDismissDialog) {
+            val rival = match.player(dialog.target)
+            val chase = GameLogic.chaseValue(match)
+            Header(rival?.name ?: "Rival", actions.onDismissDialog)
+            Text(
+                "${GameLogic.hiddenCards(match, dialog.target)} cartas ocultas · solo puedes preguntarle una vez por turno",
+                style = MaterialTheme.typography.bodySmall,
+                color = TernaColors.TextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TernaPrimaryButton("CARTA MENOR", { actions.onEnd(dialog.target, HandEnd.Low) }, Modifier.weight(1f))
+                TernaPrimaryButton("CARTA MAYOR", { actions.onEnd(dialog.target, HandEnd.High) }, Modifier.weight(1f))
+            }
+            if (match.rules.allowClaim) {
+                Spacer(Modifier.height(8.dp))
+                TernaOutlineButton(
+                    if (chase != null) "PEDIRLE EL $chase" else "PEDIRLE UN NÚMERO",
+                    { if (chase != null) actions.onClaimTarget(dialog.target, chase) else actions.onPickNumberFor(dialog.target) },
+                    Modifier.fillMaxWidth(),
+                )
+            }
+            MismatchNote(match)
+        }
+
+        is GameDialog.PickNumber -> TernaDialog(onDismiss = actions.onDismissDialog) {
+            Header(if (dialog.target != null) "¿Qué número le pides a ${match.nameOf(dialog.target)}?" else "¿Qué número pides?", actions.onDismissDialog)
             Text(
                 "Dile a un rival que su carta mayor o menor es este número.",
                 style = MaterialTheme.typography.bodySmall,
@@ -119,7 +146,7 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
         is GameDialog.PickClaimTarget -> TernaDialog(onDismiss = actions.onDismissDialog) {
             Header("¿A quién le pides el ${dialog.value}?", actions.onDismissDialog)
             Text(
-                "Debe ser su carta mayor o menor. Si no lo tiene: -1000 de aura y pierdes el turno.",
+                "Debe ser su carta menor o su carta mayor (una en el medio no cuenta). Si no la tiene: -1000 de aura y pierdes el turno.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TernaColors.TextMuted,
                 textAlign = TextAlign.Center,
@@ -132,6 +159,20 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
             }
         }
     }
+}
+
+/** Recuerda la regla que protege la información: la carta equivocada no se muestra. */
+@Composable
+private fun MismatchNote(match: MatchState) {
+    val chase = GameLogic.chaseValue(match) ?: return
+    if (!match.rules.hideMismatch) return
+    Text(
+        "Si no es el $chase, no se muestra: solo se avisa y pierdes el turno.",
+        style = MaterialTheme.typography.bodySmall,
+        color = TernaColors.TextMuted,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    )
 }
 
 @Composable
