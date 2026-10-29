@@ -183,12 +183,13 @@ describe("jugar", () => {
     expect(events[0]).toMatchObject({ taunt: "AURA_MINUS_1000", target: "carla", value: 5 });
   });
 
-  it("a cada rival se le pregunta una sola vez por turno, y el aviso llega a todos en `live.asked`", async () => {
+  it("'Pedir carta' solo una vez por turno (`live.claimUsed`), pero se puede seguir preguntando a la misma persona", async () => {
     const { matchId, seq } = await scripted();
     const r1 = await act(matchId, "ana", seq, { type: "CLAIM", target: "carla", value: 4 });
-    expect((await matchNode(matchId))!.live.asked).toEqual(["carla"]);
-    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "HIGH" }))).toBe("TARGET_ALREADY_USED");
-    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "CLAIM", target: "carla", value: 4, count: 2 }))).toBe("TARGET_ALREADY_USED");
+    expect((await matchNode(matchId))!.live.claimUsed).toBe(true);
+    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "CLAIM", target: "beto", value: 4 }))).toBe("CLAIM_ALREADY_USED");
+    // Preguntar (revelar) a la misma persona no tiene límite.
+    await expect(act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "HIGH" })).resolves.toBeTruthy();
   });
 
   it("deducir bien entrega la carta y sigue el turno", async () => {
@@ -270,7 +271,7 @@ describe("tiempo agotado", () => {
     const { matchId } = await startedMatch(3);
     expect((await matchNode(matchId))!.meta).toMatchObject({
       setSize: 3, allowPass: true, allowClaim: true, allowSelfReveal: true, minRevealsBeforePass: 1,
-      oncePerTarget: true, hideMismatch: true, allowMultiClaim: false,
+      claimOncePerTurn: true, hideMismatch: true, allowMultiClaim: false,
     });
   });
 

@@ -1,4 +1,4 @@
-import { askedTargets, canAsk, currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, isDeadEnd, ownCardsToComplete, planHandCards } from "./queries.js";
+import { claimBlocked, currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, isDeadEnd, ownCardsToComplete, planHandCards } from "./queries.js";
 import type {
   Action,
   ApplyResult,
@@ -77,8 +77,6 @@ function revealHand(state: GameState, out: Emitter, target: PlayerId, end: HandE
   }
   const index = hiddenEndIndex(state, target, end);
   if (index === null) return "NO_HIDDEN_CARDS";
-  if (!canAsk(state, target)) return "TARGET_ALREADY_USED";
-  markAsked(state, target);
 
   const value = state.hands[target]![index]!;
   resolveReveal(state, out, { source: "HAND", owner: target, index, end, value, claimed: false });
@@ -102,12 +100,12 @@ function revealCenter(state: GameState, out: Emitter, slot: number): EngineError
 function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, end: HandEnd | undefined, count: number): EngineErrorCode | null {
   const { options, maxNumber, setSize } = state.ruleSet;
   if (!options.allowClaim) return "CLAIM_DISABLED";
+  if (claimBlocked(state)) return "CLAIM_ALREADY_USED";
   if (!state.players.includes(target)) return "UNKNOWN_PLAYER";
   if (target === state.turn.player) return "CLAIM_SELF";
   if (!Number.isInteger(value) || value < 1 || value > maxNumber) return "INVALID_VALUE";
   if (options.claimRequiresEnd && !end) return "CLAIM_END_REQUIRED";
   if (!hasHiddenCards(state, target)) return "NO_HIDDEN_CARDS";
-  if (!canAsk(state, target)) return "TARGET_ALREADY_USED";
 
   // Si ya se está persiguiendo un número, deducir otro no tiene sentido: se rechaza sin penalizar.
   const chasing = currentTurnValue(state);
@@ -118,7 +116,7 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
   }
   // Sin "varias de golpe", cada petición saca una sola carta: las demás hay que descubrirlas después.
   if (count > 1 && !options.allowMultiClaim) return "INVALID_COUNT";
-  markAsked(state, target);
+  if (options.claimOncePerTurn) state.turn.claimUsed = true;
 
   const picks = planHandCards(state, target, value, count, end);
   if (picks) {
@@ -188,12 +186,6 @@ function toMismatchPick(reveal: Reveal): MismatchPick {
   return reveal.source === "HAND" ? { source: "HAND", owner: reveal.owner, end: reveal.end } : { source: "CENTER", slot: reveal.slot };
 }
 
-/** Apunta que a `target` ya se le preguntó en este turno (solo cuenta con la opción `oncePerTarget`). */
-function markAsked(state: GameState, target: PlayerId): void {
-  if (!state.ruleSet.options.oncePerTarget || target === state.turn.player) return;
-  state.turn.asked = [...askedTargets(state), target];
-}
-
 function completeSet(state: GameState, out: Emitter): void {
   const player = state.turn.player;
   const cards = state.turn.revealed;
@@ -211,7 +203,7 @@ function completeSet(state: GameState, out: Emitter): void {
 
   state.sets[player]!.push(value);
   state.turn.revealed = [];
-  delete state.turn.asked;
+  delete state.turn.claimUsed;
   out.emit({ type: "SET_COMPLETED", player, value, cards });
 
   const reason = winReasonAfterSet(state.ruleSet, state.sets[player]!, value);

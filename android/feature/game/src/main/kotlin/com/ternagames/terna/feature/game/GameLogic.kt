@@ -35,13 +35,16 @@ internal object GameLogic {
         return handCount - match.revealed.count { it.owner == uid }
     }
 
-    /** Rivales a los que se les puede preguntar ahora: tienen cartas ocultas y no se les preguntó ya en este turno. */
+    /** Rivales a los que se les puede preguntar o pedir una carta: los que aún tienen cartas ocultas. */
     fun otherTargets(match: MatchState, me: String): List<MatchPlayer> =
-        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 && it.uid !in match.asked }
+        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 }
 
-    /** Rivales con cartas ocultas a los que ya se les preguntó en este turno (la mesa los muestra bloqueados). */
-    fun lockedTargets(match: MatchState, me: String): List<MatchPlayer> =
-        match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 && it.uid in match.asked }
+    /** ¿Ya se usó "Pedir carta" en este turno y la sala solo deja una? */
+    fun claimUsedUp(match: MatchState): Boolean = match.rules.claimOncePerTurn && match.claimUsed
+
+    /** "Pedir carta" disponible: la sala lo permite, no se usó ya en este turno y hay a quién pedirle. */
+    fun canClaim(match: MatchState, me: String): Boolean =
+        match.rules.allowClaim && !claimUsedUp(match) && otherTargets(match, me).isNotEmpty()
 
     /** Cartas que faltan en la mesa para formar la terna. */
     fun remainingToSet(match: MatchState): Int = (match.rules.setSize - match.revealed.size).coerceAtLeast(0)
@@ -63,20 +66,27 @@ internal object GameLogic {
 
     /** No queda nada que revelar ni pedir: el servidor deja pasar siempre, aunque la sala lo tenga apagado. */
     fun isDeadEnd(match: MatchState, me: String): Boolean =
-        revealTargets(match, me).isEmpty() && !canRevealCenter(match) && (!match.rules.allowClaim || otherTargets(match, me).isEmpty())
+        revealTargets(match, me).isEmpty() && !canRevealCenter(match) && !canClaim(match, me)
 
     fun canPass(match: MatchState, me: String): Boolean =
         (match.rules.allowPass && match.revealed.size >= match.rules.minRevealsBeforePass) || isDeadEnd(match, me)
 
-    /** El botón "Pasar turno" se muestra si la sala lo permite o si no quedan jugadas. */
-    fun showsPass(match: MatchState, me: String): Boolean = match.rules.allowPass || isDeadEnd(match, me)
-
     /** Por qué no se puede pasar todavía (null si se puede). */
     fun passBlockedReason(match: MatchState, me: String): String? = when {
         canPass(match, me) -> null
-        match.revealed.size < match.rules.minRevealsBeforePass -> "Destapa una carta para poder pasar"
-        else -> null
+        !match.rules.allowPass -> "Esta sala no permite pasar el turno"
+        else -> "Destapa una carta para poder pasar"
     }
+
+    /** Quien juega después del jugador en turno. */
+    fun nextPlayer(match: MatchState): MatchPlayer? {
+        val i = match.players.indexOfFirst { it.uid == match.turn.player }
+        return if (i < 0) null else match.players[(i + 1) % match.players.size]
+    }
+
+    /** Carta de `uid` que está a la vista en la mesa (para resaltar a ese rival), si la hay. */
+    fun cardShownBy(tray: Tray, uid: String): RevealedCard? =
+        if (tray.kind == TrayKind.Live || tray.kind == TrayKind.Completed) tray.cards.lastOrNull { it.owner == uid } else null
 
     /**
      * Extremo de mi propia mano con el que puedo cerrar la terna ("¡Hacer terna!"), o null.

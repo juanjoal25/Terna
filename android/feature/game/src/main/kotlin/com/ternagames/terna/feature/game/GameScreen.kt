@@ -46,7 +46,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -131,6 +130,15 @@ fun GameScreen(
     }
     LaunchedEffect(state.myTurnAlert) {
         if (state.myTurnAlert > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    // Últimos 5 segundos de mi turno: una vibración corta por segundo.
+    val tickSecond = state.match?.let { m ->
+        if (m.finished || m.turn.player != state.myUid || state.serverNow < m.turn.startsAt) -1L
+        else ((m.turn.deadline - state.serverNow + 999) / 1000).takeIf { it in 1..5 } ?: -1L
+    } ?: -1L
+    LaunchedEffect(tickSecond) {
+        if (tickSecond > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
     LaunchedEffect(state.exit) {
@@ -222,6 +230,17 @@ internal fun GameContent(match: MatchState, state: GameUiState, actions: GameAct
         ActionPanel(match, state, myTurn, actions, Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 6.dp))
 
         TurnAnnouncement(state.myTurnAlert, "¡TU TURNO!", Modifier.align(Alignment.Center).offset(y = (-30).dp))
+
+        // Confeti al completar una terna y al ganar.
+        val iWon = match.finished && match.result?.winners?.contains(me) == true
+        ConfettiBurst(
+            trigger = when {
+                iWon -> "win"
+                tray.kind == GameLogic.TrayKind.Completed -> match.seq
+                else -> null
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
@@ -251,7 +270,6 @@ private fun Opponents(match: MatchState, state: GameUiState, tray: GameLogic.Tra
     // En el orden en que van jugando después de mí.
     val rivals = match.players.filter { it.uid != me }.sortedBy { (it.seat - mySeat + n) % n }
     val selectable = GameLogic.otherTargets(match, me).map { it.uid }.toSet()
-    val locked = GameLogic.lockedTargets(match, me).map { it.uid }.toSet()
     val failedPick = tray.mismatch?.takeIf { tray.kind == GameLogic.TrayKind.Failed }
 
     Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top) {
@@ -261,7 +279,7 @@ private fun Opponents(match: MatchState, state: GameUiState, tray: GameLogic.Tra
                 player = rival,
                 active = !match.finished && match.turn.player == rival.uid,
                 selectable = canTap && rival.uid in selectable,
-                locked = !match.finished && rival.uid in locked && match.turn.player == me,
+                showing = GameLogic.cardShownBy(tray, rival.uid)?.value,
                 mismatchChase = if (failedPick?.owner == rival.uid) GameLogic.failedChase(tray) else null,
                 backH = backH,
                 onClick = if (canTap) ({ onRivalTap(rival.uid) }) else null,
@@ -276,7 +294,7 @@ private fun Opponent(
     player: MatchPlayer,
     active: Boolean,
     selectable: Boolean,
-    locked: Boolean,
+    showing: Int?,
     mismatchChase: Int?,
     backH: Dp,
     onClick: (() -> Unit)?,
@@ -287,26 +305,28 @@ private fun Opponent(
     val dots = if (active) rememberDots() else ""
     val borderColor = when {
         mismatchChase != null -> TernaColors.Danger
+        showing != null -> Green.copy(alpha = 0.6f + 0.4f * pulse)
         active -> TernaColors.Yellow.copy(alpha = 0.55f + 0.45f * pulse)
         selectable -> TernaColors.Yellow.copy(alpha = 0.35f + 0.5f * pulse)
         else -> Color(0x66FDE047)
     }
-    val borderWidth = if (active || mismatchChase != null) 2.5.dp else if (selectable) 2.dp else 1.dp
+    val borderWidth = if (active || mismatchChase != null || showing != null) 2.5.dp else if (selectable) 2.dp else 1.dp
     val status = when {
         !player.connected -> "SIN CONEXIÓN"
         mismatchChase != null -> "✗ NO ERA EL $mismatchChase"
+        showing != null -> "ENSEÑA UN $showing"
         active -> "PENSANDO$dots"
-        locked -> "YA PREGUNTADO ✓"
         selectable -> "TOCA PARA PREGUNTAR"
         else -> "${player.handCount} CARTAS"
     }
     val statusColor = when {
         mismatchChase != null -> TernaColors.Danger
+        showing != null -> Green
         active || selectable -> TernaColors.Yellow
         else -> TernaColors.TextMuted
     }
 
-    Column(modifier.alpha(if (locked) 0.6f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -682,13 +702,14 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
 
     val canPass = GameLogic.canPass(match, me)
     val hint = when {
-        !myTurn -> "Atento a la jugada de ${match.nameOf(match.turn.player)}"
+        !myTurn -> "Juega ${match.nameOf(match.turn.player)}" + if (GameLogic.nextPlayer(match)?.uid == me) " · ¡después juegas tú!" else ""
         waiting -> "Mira las cartas de la mesa…"
         state.busy -> "Enviando tu jugada…"
         state.selectingCenter -> "Toca una carta del centro"
         GameLogic.isDeadEnd(match, me) -> "No quedan jugadas: pasa el turno"
         completeEnd != null -> "¡Te falta una carta y la tienes en la mano!"
-        chase != null -> "Busca otro $chase · o pasa el turno"
+        chase != null && GameLogic.claimUsedUp(match) -> "Busca otro $chase · pregunta o pasa el turno"
+        chase != null -> "Busca otro $chase · pregunta, pide o pasa"
         else -> "Toca a un rival o elige una acción"
     }
 
@@ -732,20 +753,19 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
             )
             GameButton("PREGUNTAR", actions.onAsk, Modifier.weight(1f), enabled = enabled && GameLogic.revealTargets(match, me).isNotEmpty())
         }
-        if (match.rules.allowClaim || GameLogic.showsPass(match, me)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (match.rules.allowClaim) {
-                    GameButton("PEDIR CARTA", actions.onClaim, Modifier.weight(1f), enabled = enabled && GameLogic.otherTargets(match, me).isNotEmpty())
-                }
-                if (GameLogic.showsPass(match, me)) {
-                    GameButton("PASAR TURNO", actions.onPass, Modifier.weight(1f), enabled = enabled && canPass, outlined = true)
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            if (match.rules.allowClaim) {
+                GameButton("PEDIR CARTA", actions.onClaim, Modifier.weight(1f), enabled = enabled && GameLogic.canClaim(match, me))
             }
-            if (enabled && !canPass && GameLogic.showsPass(match, me)) {
-                GameLogic.passBlockedReason(match, me)?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TernaColors.TextMuted)
-                }
-            }
+            GameButton("PASAR TURNO", actions.onPass, Modifier.weight(1f), enabled = enabled && canPass, outlined = true)
+        }
+        // Por qué un botón está apagado: nada de adivinar.
+        val note = if (!enabled) null else listOfNotNull(
+            "Ya pediste una carta en este turno".takeIf { match.rules.allowClaim && GameLogic.claimUsedUp(match) },
+            GameLogic.passBlockedReason(match, me),
+        ).joinToString(" · ").ifEmpty { null }
+        if (note != null) {
+            Text(note, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TernaColors.TextMuted, maxLines = 2)
         }
     }
 }

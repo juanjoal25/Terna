@@ -22,7 +22,7 @@ fun Throwable.userMessage(): String = when ((this as? ServerException)?.reason) 
     "TOO_EARLY" -> "Espera un momento: todos están viendo las cartas."
     "STALE_STATE" -> "La mesa cambió, inténtalo de nuevo."
     "GAME_OVER" -> "La partida ya terminó."
-    "TARGET_ALREADY_USED" -> "Ya le preguntaste a esa persona en este turno."
+    "CLAIM_ALREADY_USED" -> "Solo puedes pedir una carta por turno. Sigue preguntando o pasa el turno."
     "PASS_TOO_EARLY" -> "Destapa al menos una carta antes de pasar el turno."
     "PASS_DISABLED" -> "En esta sala no se puede pasar el turno."
     "CLAIM_VALUE_MISMATCH" -> "Ya estás buscando otro número en este turno."

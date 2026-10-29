@@ -47,8 +47,8 @@ export interface TurnOptions {
   minRevealsBeforePass: number;
   /** Si es true, tras completar un set el mismo jugador sigue jugando. */
   continueAfterSet: boolean;
-  /** Cada rival solo puede ser objetivo una vez por turno (revelarle o pedirle una carta). Tu propia mano no cuenta. */
-  oncePerTarget: boolean;
+  /** "Pedir carta" (deducir) solo se puede usar una vez por turno. Preguntar (revelar menor/mayor) no tiene límite. */
+  claimOncePerTurn: boolean;
   /** Si es true, la carta que no coincide NO se muestra: solo se avisa de que no era la correcta. */
   hideMismatch: boolean;
   /** Permite pedir varias cartas iguales de una vez a un rival (`count` > 1 en CLAIM). */
@@ -88,8 +88,8 @@ export interface TurnState {
   player: PlayerId;
   number: number;
   revealed: Reveal[];
-  /** Rivales a los que ya se les pidió o reveló algo en este turno (solo con `oncePerTarget`). */
-  asked?: PlayerId[];
+  /** Ya se usó "Pedir carta" en este turno (solo se guarda con `claimOncePerTurn`). */
+  claimUsed?: boolean;
 }
 
 /** Dónde estaba la carta que no coincidía. Nunca incluye su valor: no se muestra a nadie. */
@@ -158,7 +158,7 @@ export type EngineErrorCode =
   | "CLAIM_VALUE_MISMATCH"
   | "INVALID_VALUE"
   | "INVALID_COUNT"
-  | "TARGET_ALREADY_USED"
+  | "CLAIM_ALREADY_USED"
   | "PASS_DISABLED"
   | "PASS_TOO_EARLY";
 

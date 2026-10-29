@@ -28,11 +28,11 @@ class GameLogicTest {
         turnPlayer: String = "ana",
         startsAt: Long = 1_000,
         center: List<Boolean> = listOf(true, true, false),
-        asked: List<String> = emptyList(),
+        claimUsed: Boolean = false,
     ) = MatchState(
         id = "m1", roomId = "r1", ruleSet = "TERNA_CLASSIC", finished = false, turnSeconds = 20, rules = rules,
         players = listOf(player("ana", 0, myHand.size), player("beto", 1, 3), player("carla", 2, 0)),
-        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, asked = asked, center = center,
+        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, claimUsed = claimUsed, center = center,
         events = events, result = null, myHand = myHand,
     )
 
@@ -111,23 +111,28 @@ class GameLogicTest {
 
     @Test
     fun `si no queda ninguna jugada siempre se puede pasar, aunque la sala lo tenga apagado`() {
-        // Ana ya no tiene cartas ocultas, el centro está vacío y a Beto ya se le preguntó.
-        val atascado = match(myHand = emptyList(), center = listOf(false, false), asked = listOf("beto"))
+        // Ana no tiene cartas ocultas, el centro está vacío y ya se destaparon todas las de Beto.
+        val todasDeBeto = listOf(fromHand("beto", HandEnd.Low, 4), fromHand("beto", HandEnd.High, 4), fromHand("beto", HandEnd.Low, 4))
+        val atascado = match(myHand = emptyList(), center = listOf(false, false), revealed = todasDeBeto)
         assertTrue(GameLogic.isDeadEnd(atascado, "ana"))
         assertTrue(GameLogic.canPass(atascado, "ana"))
-        assertTrue(GameLogic.showsPass(atascado, "ana"))
-        // Con jugadas disponibles y la regla apagada, ni se muestra.
+        // Con jugadas disponibles y la regla apagada no se puede, y se explica por qué.
         assertFalse(GameLogic.isDeadEnd(match(), "ana"))
-        assertFalse(GameLogic.showsPass(match(), "ana"))
+        assertFalse(GameLogic.canPass(match(), "ana"))
+        assertEquals("Esta sala no permite pasar el turno", GameLogic.passBlockedReason(match(), "ana"))
     }
 
     @Test
-    fun `a un rival al que ya se le preguntó no se le ofrece otra pregunta en el mismo turno`() {
-        val m = match(asked = listOf("beto"))
-        assertTrue(GameLogic.otherTargets(m, "ana").isEmpty())
-        assertEquals(listOf("beto"), GameLogic.lockedTargets(m, "ana").map { it.uid })
-        // Mi propia mano siempre se puede revelar.
-        assertEquals(listOf("ana"), GameLogic.revealTargets(m, "ana").map { it.uid })
+    fun `pedir carta solo una vez por turno pero preguntar sigue disponible`() {
+        val reglas = MatchRules(claimOncePerTurn = true)
+        assertTrue(GameLogic.canClaim(match(rules = reglas), "ana"))
+        val usada = match(rules = reglas, claimUsed = true)
+        assertTrue(GameLogic.claimUsedUp(usada))
+        assertFalse(GameLogic.canClaim(usada, "ana"))
+        // Preguntar (revelar) no se toca: se puede repetir con la misma persona.
+        assertEquals(listOf("beto", "ana"), GameLogic.revealTargets(usada, "ana").map { it.uid })
+        // Sin la regla, el aviso del servidor no bloquea nada.
+        assertFalse(GameLogic.claimUsedUp(match(claimUsed = true)))
     }
 
     @Test

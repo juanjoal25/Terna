@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
@@ -41,6 +44,7 @@ import com.ternagames.terna.core.designsystem.component.TernaPrimaryButton
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 import com.ternagames.terna.core.model.GameResult
 import com.ternagames.terna.core.model.HandEnd
+import com.ternagames.terna.core.model.MatchPlayer
 import com.ternagames.terna.core.model.MatchState
 
 @Composable
@@ -85,7 +89,7 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
             val chase = GameLogic.chaseValue(match)
             Header(rival?.name ?: "Rival", actions.onDismissDialog)
             Text(
-                "${GameLogic.hiddenCards(match, dialog.target)} cartas ocultas · solo puedes preguntarle una vez por turno",
+                "${GameLogic.hiddenCards(match, dialog.target)} cartas ocultas · preguntar no tiene límite",
                 style = MaterialTheme.typography.bodySmall,
                 color = TernaColors.TextMuted,
                 textAlign = TextAlign.Center,
@@ -101,6 +105,14 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
                     if (chase != null) "PEDIRLE EL $chase" else "PEDIRLE UN NÚMERO",
                     { if (chase != null) actions.onClaimTarget(dialog.target, chase) else actions.onPickNumberFor(dialog.target) },
                     Modifier.fillMaxWidth(),
+                    enabled = GameLogic.canClaim(match, me),
+                )
+                Text(
+                    if (GameLogic.claimUsedUp(match)) "Ya pediste una carta en este turno: sigue preguntando o pasa." else "Pedir carta solo se puede una vez por turno.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TernaColors.TextMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 )
             }
             MismatchNote(match)
@@ -262,7 +274,7 @@ private fun ResultDialog(match: MatchState, result: GameResult, me: String, acti
                 painterResource(DesignR.drawable.img_ganar_7),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(86.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(10.dp)),
             )
             Spacer(Modifier.height(8.dp))
         } else {
@@ -286,11 +298,51 @@ private fun ResultDialog(match: MatchState, result: GameResult, me: String, acti
             style = MaterialTheme.typography.bodyMedium,
             color = TernaColors.TextMuted,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TernaPrimaryButton("VOLVER A LA SALA", actions.onBackToRoom, Modifier.fillMaxWidth())
-            TernaOutlineButton("IR AL LOBBY", actions.onGoLobby, Modifier.fillMaxWidth())
+        Standings(match, result, me)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TernaPrimaryButton("VOLVER A LA SALA", actions.onBackToRoom, Modifier.weight(1f))
+            TernaOutlineButton("IR AL LOBBY", actions.onGoLobby, Modifier.weight(1f))
+        }
+    }
+}
+
+/** Quién quedó dónde: primero los ganadores, luego por número de ternas. */
+@Composable
+private fun Standings(match: MatchState, result: GameResult, me: String) {
+    val ranking = match.players.sortedWith(compareByDescending<MatchPlayer> { it.uid in result.winners }.thenByDescending { it.sets.size })
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 104.dp).verticalScroll(rememberScrollState()),
+    ) {
+        ranking.forEach { p ->
+            val winner = p.uid in result.winners
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (winner) TernaColors.Yellow.copy(alpha = 0.2f) else TernaColors.PanelVariant)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                PlayerAvatar(p.avatar, 24.dp, borderWidth = if (winner) 2.dp else 0.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    p.name + if (p.uid == me) " (tú)" else "",
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
+                    color = TernaColors.White,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "${p.sets.size} ${if (p.sets.size == 1) "terna" else "ternas"}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = if (winner) TernaColors.Yellow else TernaColors.TextMuted,
+                )
+                if (winner) Text(" 👑", fontSize = 14.sp)
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.ternagames.terna.feature.game
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -16,10 +17,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,7 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +53,9 @@ import androidx.compose.ui.unit.sp
 import com.ternagames.terna.core.designsystem.component.PlayingCard
 import com.ternagames.terna.core.designsystem.theme.TernaColors
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Carta que gira sobre su eje: boca abajo (`faceUp = false`) o con su número. Al voltear de nuevo
@@ -188,5 +197,41 @@ internal fun TimerBar(fraction: Float, urgent: Boolean, modifier: Modifier = Mod
     val shape = RoundedCornerShape(50)
     Box(modifier.height(6.dp).fillMaxWidth().clip(shape).background(Color(0x33FFFFFF))) {
         Box(Modifier.fillMaxHeight().fillMaxWidth(animated).clip(shape).background(color))
+    }
+}
+
+private val ConfettiColors = listOf(Color(0xFFFDE047), Color(0xFF4ADE80), Color(0xFFFF383C), Color(0xFF60A5FA), Color(0xFFF472B6), Color(0xFFFFFFFF))
+
+/**
+ * Lluvia de confeti desde el centro. Se dispara cada vez que `trigger` cambia (null = nada) y dura
+ * poco más de un segundo. No recibe toques.
+ */
+@Composable
+internal fun ConfettiBurst(trigger: Any?, modifier: Modifier = Modifier) {
+    val progress = remember { Animatable(1f) }
+    var seed by remember { mutableIntStateOf(0) }
+    LaunchedEffect(trigger) {
+        if (trigger == null) return@LaunchedEffect
+        seed = trigger.hashCode()
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(1500, easing = LinearOutSlowInEasing))
+    }
+    Canvas(modifier.fillMaxSize()) {
+        val p = progress.value
+        if (p >= 1f) return@Canvas
+        val rnd = java.util.Random(seed.toLong())
+        repeat(42) { i ->
+            val angle = rnd.nextFloat() * (2 * PI).toFloat()
+            val speed = (0.25f + rnd.nextFloat() * 0.75f) * size.minDimension * 1.1f
+            val x = center.x + cos(angle) * speed * p
+            // Sale hacia arriba y luego cae por la gravedad.
+            val y = center.y + sin(angle) * speed * p + size.height * 0.55f * p * p - size.height * 0.12f
+            val w = 7.dp.toPx() * (0.6f + rnd.nextFloat())
+            val spin = p * 360f * (rnd.nextFloat() - 0.5f) * 3f
+            val color = ConfettiColors[i % ConfettiColors.size].copy(alpha = (1.2f - p).coerceIn(0f, 1f))
+            rotate(degrees = spin, pivot = Offset(x, y)) {
+                drawRect(color = color, topLeft = Offset(x - w / 2, y - w / 3), size = Size(w, w * 0.6f))
+            }
+        }
     }
 }

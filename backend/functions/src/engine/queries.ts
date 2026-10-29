@@ -69,15 +69,9 @@ export function hiddenCenterSlots(state: GameState): number[] {
   return state.center.flatMap((c, slot) => (c !== null && !revealed.has(slot) ? [slot] : []));
 }
 
-/** Rivales a los que ya se les preguntó en este turno. */
-export function askedTargets(state: GameState): PlayerId[] {
-  return state.turn.asked ?? [];
-}
-
-/** ¿Se le puede preguntar (revelar o pedir) a `target` ahora? Tu propia mano no cuenta; las rivales, una vez por turno. */
-export function canAsk(state: GameState, target: PlayerId): boolean {
-  if (!state.ruleSet.options.oncePerTarget || target === state.turn.player) return true;
-  return !askedTargets(state).includes(target);
+/** ¿Ya se usó "Pedir carta" en este turno y la sala solo permite una vez? */
+export function claimBlocked(state: GameState): boolean {
+  return state.ruleSet.options.claimOncePerTurn === true && state.turn.claimUsed === true;
 }
 
 /** Valor que se está persiguiendo este turno, o null si aún no se reveló nada. */
@@ -121,14 +115,14 @@ export function ownCardToComplete(state: GameState): HandEnd | null {
 function moves(state: GameState) {
   const { options } = state.ruleSet;
   const me = state.turn.player;
-  const others = state.players.filter((p) => p !== me && hasHiddenCards(state, p) && canAsk(state, p));
+  const others = state.players.filter((p) => p !== me && hasHiddenCards(state, p));
   const selfAllowed = hasHiddenCards(state, me) && (options.allowSelfReveal || !hasOtherSources(state));
   return {
     others,
     selfAllowed,
     revealTargets: selfAllowed ? [...others, me] : others,
     centerSlots: hiddenCenterSlots(state),
-    claimTargets: options.allowClaim ? others : [],
+    claimTargets: options.allowClaim && !claimBlocked(state) ? others : [],
   };
 }
 

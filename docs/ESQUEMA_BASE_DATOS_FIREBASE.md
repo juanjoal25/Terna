@@ -172,7 +172,7 @@ Ubicación: **`us-central1`**.
           { "source": "HAND", "owner": "{uid}", "end": "HIGH", "value": 9, "claimed": false },
           { "source": "CENTER", "slot": 4, "value": 9 }
         ],
-        "asked": ["{uid2}"],              // Rivales a los que ya se les preguntó en este turno (oncePerTarget); ausente = ninguno
+        "claimUsed": true,                // Ya se usó "Pedir carta" en este turno (claimOncePerTurn); ausente = no
         "center": [true, true, false, true, true, true, true, true], // true = carta oculta en mesa (sin null: nunca se recorta)
         "lastEvents": [                   // Todos los eventos de la última jugada, en orden
           { "seq": 41, "type": "CARD_REVEALED", "player": "{uid}",
@@ -332,13 +332,13 @@ El cliente **nunca escribe** salas ni partidas: solo llama a estas funciones con
 
 `count` (por defecto 1): solo vale más de 1 si la sala activa `allowMultiClaim` (por defecto no; si no, `INVALID_COUNT`); entonces pide varias cartas iguales seguidas al mismo rival de una vez, todo o nada, hasta lo que falta para la terna.
 
-Con `oncePerTarget` (por defecto sí), a cada rival solo se le puede revelar o pedir una carta por turno: repetirlo responde `TARGET_ALREADY_USED`. Con `hideMismatch` (por defecto sí), la carta que no coincide no se publica. `PASS` exige `minRevealsBeforePass` cartas destapadas, salvo que no quede ninguna jugada posible. Tras cualquier carta destapada, si las cartas iguales de tu propia mano (seguidas en un extremo) completan la terna, el servidor las destapa solo (eventos `CARD_REVEALED` seguidos de `SET_COMPLETED`).
+Con `claimOncePerTurn` (por defecto sí), `CLAIM` solo se puede usar una vez por turno: repetirlo responde `CLAIM_ALREADY_USED`. `REVEAL_HAND` no tiene límite, también con la misma persona. Con `hideMismatch` (por defecto sí), la carta que no coincide no se publica. `PASS` exige `minRevealsBeforePass` cartas destapadas, salvo que no quede ninguna jugada posible. Tras cualquier carta destapada, si las cartas iguales de tu propia mano (seguidas en un extremo) completan la terna, el servidor las destapa solo (eventos `CARD_REVEALED` seguidos de `SET_COMPLETED`).
 
 **`expectedSeq`** es el `live.seq` que la app tenía al tocar. Si otra jugada llegó antes, el servidor responde `STALE_STATE` y la app simplemente espera al estado nuevo (esto cubre el doble toque). **`TOO_EARLY`** protege la pausa tras un fallo: nadie juega antes de `live.turn.startsAt`, así todos alcanzan a ver las cartas.
 
 **Tiempo agotado sin servidor de temporizadores:** cada turno trae `live.turn.deadline`. Cuando se pasa, **cualquier jugador de la mesa** llama a `timeoutTurn`; el servidor lo comprueba con su propio reloj y, si es cierto, pasa el turno (evento `TURN_TIMEOUT`; las cartas reveladas vuelven a su sitio). La app de quien tiene el turno avisa primero y las demás esperan escalonadas por asiento. Una mesa nunca se congela porque alguien se durmió, y no hace falta Cloud Tasks.
 
-**`meta` publica las reglas activas** (`setSize`, `allowPass`, `allowClaim`, `allowSelfReveal`, `minRevealsBeforePass`, `oncePerTarget`, `hideMismatch`, `allowMultiClaim`) para que la app muestre solo los botones que aplican.
+**`meta` publica las reglas activas** (`setSize`, `allowPass`, `allowClaim`, `allowSelfReveal`, `minRevealsBeforePass`, `claimOncePerTurn`, `hideMismatch`, `allowMultiClaim`) para que la app muestre solo los botones que aplican.
 
 Pendiente: bots que reemplacen a quien se desconecte (y la partida rápida, que los necesita), presencia y expulsar a quien se duerme varias veces seguidas.
 
@@ -399,7 +399,7 @@ data class MatchLiveDto(
     val seq: Long = 0L,
     val turn: TurnDto = TurnDto(),
     val revealed: List<PublicRevealDto> = emptyList(),
-    val asked: List<String> = emptyList(),   // rivales ya preguntados en este turno
+    val claimUsed: Boolean = false,          // ya se usó "Pedir carta" en este turno
     val center: List<Boolean> = emptyList(),
     val lastEvents: List<GameEventDto> = emptyList(),
     val result: GameResultDto? = null

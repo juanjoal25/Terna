@@ -245,6 +245,10 @@ class GameViewModel @Inject constructor(
 
     fun claim() {
         val match = _state.value.match ?: return
+        if (GameLogic.claimUsedUp(match)) {
+            _state.update { it.copy(message = "Solo puedes pedir una carta por turno. Sigue preguntando o pasa el turno.") }
+            return
+        }
         val chase = GameLogic.chaseValue(match)
         _state.update { it.copy(dialog = if (chase != null) GameDialog.PickClaimTarget(chase) else GameDialog.PickNumber(), selectingCenter = false) }
     }
@@ -255,11 +259,10 @@ class GameViewModel @Inject constructor(
         val match = s.match ?: return
         if (!s.canAct || uid == myUid) return
         val rival = match.player(uid) ?: return
-        when {
-            GameLogic.otherTargets(match, myUid).any { it.uid == uid } ->
-                _state.update { it.copy(dialog = GameDialog.RivalMenu(uid), selectingCenter = false) }
-            uid in match.asked -> _state.update { it.copy(message = "Ya le preguntaste a ${rival.name} en este turno.") }
-            else -> _state.update { it.copy(message = "${rival.name} no tiene cartas ocultas.") }
+        if (GameLogic.otherTargets(match, myUid).any { it.uid == uid }) {
+            _state.update { it.copy(dialog = GameDialog.RivalMenu(uid), selectingCenter = false) }
+        } else {
+            _state.update { it.copy(message = "${rival.name} no tiene cartas ocultas.") }
         }
     }
 

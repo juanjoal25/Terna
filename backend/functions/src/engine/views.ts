@@ -16,7 +16,7 @@ export interface PublicView {
   players: PublicPlayer[];
   /** true = el hueco tiene una carta boca abajo. Nunca se publica su valor. */
   center: boolean[];
-  turn: { player: PlayerId; number: number; revealed: PublicReveal[]; asked: PlayerId[] };
+  turn: { player: PlayerId; number: number; revealed: PublicReveal[]; claimUsed: boolean };
   status: GameState["status"];
   result: GameResult | null;
   seq: number;
@@ -34,7 +34,7 @@ export function publicView(state: GameState): PublicView {
     ruleSetId: state.ruleSet.id,
     players: state.players.map((id) => ({ id, handCount: state.hands[id]!.length, sets: [...state.sets[id]!] })),
     center: state.center.map((c) => c !== null),
-    turn: { player: state.turn.player, number: state.turn.number, revealed: state.turn.revealed.map(toPublicReveal), asked: [...(state.turn.asked ?? [])] },
+    turn: { player: state.turn.player, number: state.turn.number, revealed: state.turn.revealed.map(toPublicReveal), claimUsed: state.turn.claimUsed === true },
     status: state.status,
     result: state.result,
     seq: state.seq,

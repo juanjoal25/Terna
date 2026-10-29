@@ -35,8 +35,8 @@ export interface MatchNode {
     allowClaim: boolean;
     allowSelfReveal: boolean;
     minRevealsBeforePass: number;
-    /** Cada rival solo puede ser objetivo una vez por turno. */
-    oncePerTarget: boolean;
+    /** "Pedir carta" solo se puede usar una vez por turno. */
+    claimOncePerTurn: boolean;
     /** La carta que no coincide no se muestra: solo se avisa. */
     hideMismatch: boolean;
     /** Se pueden pedir varias cartas iguales de golpe. */

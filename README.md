@@ -41,7 +41,7 @@ Juego de cartas **multijugador para Android**, basado en el juego de mesa *Trio*
 - **Sala de espera:** ver quién entró, expulsar jugadores (anfitrión), iniciar la partida, salir.
 - **Partida completa en la mesa**, de 3 a 6 jugadores, en redes distintas (todo pasa por la nube):
   revelar menor/mayor de cualquiera (incluido uno mismo), revelar el centro, **"Pedir carta"** (deducir) con la penalización de *"-1000 de aura"*, ternas, victoria por 3 ternas o por la terna de 7 (*Jackpot 777*), temporizador por turno y fin de partida.
-- **Información controlada:** la carta equivocada no se muestra, a cada rival se le pregunta una vez por turno, se puede pasar turno y la terna se completa sola con tus propias cartas (ver [§2.4](#24-que-no-se-regale-información)).
+- **Información controlada:** la carta equivocada no se muestra, "Pedir carta" solo una vez por turno, se puede pasar turno y la terna se completa sola con tus propias cartas (ver [§2.4](#24-que-no-se-regale-información)).
 - **Historial y estadísticas** guardados en Firestore al terminar cada partida (idempotente: no cuenta dos veces).
 - **Reglas configurables** por sala (casas de reglas) y motor parametrizado para el futuro modo **CUARTA**.
 
@@ -103,13 +103,13 @@ Si se acaban las cartas sin ganador, gana quien tenga más ternas.
 Para que nadie se entere de demasiado en cada turno (todas son opciones de la sala, activadas por defecto):
 
 - **La carta equivocada no se muestra.** Si destapas algo que no es el número que buscas (la menor o la mayor de alguien, o una del centro), no se ve su valor: la mesa solo avisa *"No es la carta correcta: la carta menor de Ana no era el 5"* y pierdes el turno. La primera carta del turno sí se ve siempre, porque es el número que persigues.
-- **A cada rival, una sola vez por turno** (preguntarle o pedirle una carta). Si Beto tiene dos 5 seguidos, te da uno; el otro lo descubrirás en otro turno. Tu propia mano y el centro no tienen límite. Un rival ya preguntado queda atenuado en la mesa.
-- **Una carta por petición.** No se piden dos iguales de golpe.
+- **"Pedir carta" (deducir) solo una vez por turno**; en cambio **"Preguntar" (revelar la menor o la mayor) no tiene límite**, también con la misma persona.
+- **Una carta por jugada.** Si Beto tiene dos 5 seguidos, le preguntas dos veces y te da una por pregunta; no se piden dos iguales de golpe.
 - **Una carta en el medio de una mano no se puede sacar**, ni pidiéndola ni revelando: solo cuentan la menor y la mayor. Pedir una que está en el medio es fallar (*-1000 de aura*); cuando salen las de afuera, la del medio pasa a ser extremo.
 - **Terna automática con tu mano.** Si tras destapar una carta (pidiéndola, revelándola o sacándola del centro) tus propias cartas iguales, **seguidas en un extremo de tu mano**, completan la terna, el servidor las destapa solo.
   Ejemplo: tienes `5 5 9`, aciertas el 5 de Beto → terna de 5 al instante.
   *(No se aplica si la sala desactiva "revelar la propia mano".)*
-- **Pasar turno.** Disponible tras destapar al menos una carta; devuelve las cartas a su sitio y juega el siguiente. Si ya no queda ninguna jugada (por ejemplo, ya preguntaste a todos y el centro está vacío), siempre se puede pasar para que el turno nunca se bloquee.
+- **Pasar turno.** El botón siempre está en el panel; se activa tras destapar al menos una carta (y la pantalla dice por qué está apagado). Devuelve las cartas a su sitio y juega el siguiente. Si ya no queda ninguna jugada, siempre se puede pasar para que el turno nunca se bloquee.
 - La pantalla muestra el progreso: **"Buscando el 5 · 1 de 3 en la mesa"**.
 
 ### 2.5 Reglas configurables
@@ -124,7 +124,7 @@ Se define por sala con `TurnOptions` (el motor las valida en el servidor):
 | `claimFailEndsTurn` | sí | — | Deducir mal pierde el turno. |
 | `allowPass` / `minRevealsBeforePass` | **sí** / 1 | no | "Pasar turno" tras destapar al menos una carta. Sin jugadas posibles, siempre se puede pasar. |
 | `continueAfterSet` | no | no | Seguir jugando tras una terna. |
-| `oncePerTarget` | **sí** | no | A cada rival solo se le pregunta una vez por turno. Solo es posible con ternas (con sets de 4 podría bloquear la partida). |
+| `claimOncePerTurn` | **sí** | — | "Pedir carta" solo se puede usar una vez por turno (preguntar no tiene límite). |
 | `hideMismatch` | **sí** | no | La carta que no coincide no se muestra: solo se avisa. |
 | `allowMultiClaim` | no | — | Permite pedir varias cartas iguales de golpe (`count` > 1). |
 

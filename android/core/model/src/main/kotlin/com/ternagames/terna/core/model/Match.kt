@@ -45,8 +45,8 @@ data class MatchRules(
     val allowClaim: Boolean = true,
     val allowSelfReveal: Boolean = true,
     val minRevealsBeforePass: Int = 1,
-    /** Cada rival solo puede ser objetivo una vez por turno. */
-    val oncePerTarget: Boolean = false,
+    /** "Pedir carta" solo se puede usar una vez por turno (preguntar no tiene límite). */
+    val claimOncePerTurn: Boolean = false,
     /** Se pueden pedir varias cartas iguales de golpe. */
     val allowMultiClaim: Boolean = false,
     /** La carta que no coincide no se muestra: solo se avisa. */
@@ -92,8 +92,8 @@ data class MatchState(
     val turn: TurnInfo,
     /** Cartas destapadas en el turno actual. */
     val revealed: List<RevealedCard>,
-    /** Rivales a los que ya se les preguntó en este turno (solo con `oncePerTarget`). */
-    val asked: List<String> = emptyList(),
+    /** Ya se usó "Pedir carta" en este turno (solo con `claimOncePerTurn`). */
+    val claimUsed: Boolean = false,
     /** `true` = hay una carta boca abajo en ese hueco del centro. */
     val center: List<Boolean>,
     /** Eventos de la última jugada. */
