@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidad — TERNA!</title>
+  <meta name="description" content="Política de Privacidad oficial del juego de cartas multijugador online TERNA!">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FBF9F5;
+      --card-bg: #FFFFFF;
+      --text-main: #231F20;
+      --text-muted: #5E5852;
+      --primary: #D35400;
+      --primary-light: #FDEBD0;
+      --primary-dark: #A04000;
+      --secondary: #27AE60;
+      --accent: #F39C12;
+      --border: #E8E2D9;
+      --border-focus: #D35400;
+      --shadow-sm: 0 2px 8px rgba(35, 31, 32, 0.05);
+      --shadow-md: 0 8px 24px rgba(35, 31, 32, 0.08);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.68;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      padding: 0;
+    }
+
+    /* Top Banner Header */
+    header {
+      background: linear-gradient(135deg, #2E1805 0%, #4A2800 50%, #2A1504 100%);
+      color: #FFF;
+      padding: 48px 24px 40px;
+      border-bottom: 4px solid var(--accent);
+      text-align: center;
+      position: relative;
+    }
+
+    .header-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .badge-app {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(243, 156, 18, 0.18);
+      border: 1px solid rgba(243, 156, 18, 0.4);
+      color: #F8C471;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4.5vw, 42px);
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      color: #FFF;
+    }
+
+    .header-subtitle {
+      font-size: 17px;
+      color: #E0D3C1;
+      max-width: 620px;
+      margin: 0 auto 16px;
+    }
+
+    .last-updated {
+      display: inline-block;
+      font-size: 13.5px;
+      color: #D5C2AA;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 4px 12px;
+      border-radius: 6px;
+    }
+
+    /* Main Container & Layout */
+    .layout-wrapper {
+      max-width: 1040px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 36px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .layout-wrapper {
+        grid-template-columns: 1fr;
+        margin: 24px auto;
+        gap: 24px;
+      }
+    }
+
+    /* Sticky Sidebar Navigation */
+    .toc-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      position: sticky;
+      top: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .toc-title {
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toc-list a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14.5px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      display: block;
+    }
+
+    .toc-list a:hover {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      transform: translateX(4px);
+    }
+
+    /* Main Content Sections */
+    .content-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px clamp(20px, 4vw, 48px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    section {
+      margin-bottom: 38px;
+      scroll-margin-top: 30px;
+    }
+
+    section:last-of-type {
+      margin-bottom: 0;
+    }
+
+    h2 {
+      font-size: 23px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin: 20px 0 10px;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: var(--text-main);
+    }
+
+    ul, ol {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    li strong {
+      color: var(--text-main);
+    }
+
+    /* Highlight & Notice Boxes */
+    .alert-box {
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      margin: 20px 0;
+      font-size: 15px;
+    }
+
+    .alert-warning {
+      background-color: #FEF9E7;
+      border-left: 4px solid var(--accent);
+      color: #7D6608;
+    }
+
+    .alert-info {
+      background-color: #EAF2F8;
+      border-left: 4px solid #2980B9;
+      color: #1B4F72;
+    }
+
+    .alert-success {
+      background-color: #E8F8F5;
+      border-left: 4px solid var(--secondary);
+      color: #117864;
+    }
+
+    /* Structured Data Table */
+    .table-container {
+      overflow-x: auto;
+      margin: 18px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14.5px;
+    }
+
+    th {
+      background-color: #F6F3EE;
+      color: var(--text-main);
+      font-weight: 700;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:nth-child(even) {
+      background-color: #FAF8F5;
+    }
+
+    /* Steps Box for Account Deletion */
+    .steps-card {
+      background: #FAF8F5;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin: 16px 0;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .step-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: #FFF;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      flex: 1;
+      font-size: 15px;
+    }
+
+    /* Contact Button */
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary);
+      color: #FFF;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      margin-top: 10px;
+      transition: background 0.2s ease, transform 0.15s ease;
+    }
+
+    .contact-link:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    /* Footer */
+    footer {
+      background: #1C1917;
+      color: #A8A29E;
+      text-align: center;
+      padding: 36px 20px;
+      font-size: 14px;
+      border-top: 1px solid #292524;
+      margin-top: 60px;
+    }
+
+    footer a {
+      color: #F8C471;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      body {
+        background: #FFF;
+        font-size: 12pt;
+      }
+      .toc-card, header .badge-app, .contact-link {
+        display: none;
+      }
+      .layout-wrapper {
+        grid-template-columns: 1fr;
+        margin: 0;
+        padding: 0;
+      }
+      .content-card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Banner -->
+  <header>
+    <div class="header-container">
+      <div class="badge-app">🃏 Juego Oficial · Versión Web & Móvil</div>
+      <h1>Política de Privacidad de TERNA!</h1>
+      <p class="header-subtitle">
+        Transparencia y seguridad sobre el tratamiento de tus datos en nuestro juego de cartas multijugador online.
+      </p>
+      <div class="last-updated">Última actualización: 28 de Octubre de 2026</div>
+    </div>
+  </header>
+
+  <!-- Layout Container -->
+  <div class="layout-wrapper">
+
+    <!-- Table of Contents (Sticky Nav) -->
+    <aside class="toc-card">
+      <div class="toc-title">
+        <span>📋</span> Índice de Contenidos
+      </div>
+      <nav>
+        <ul class="toc-list">
+          <li><a href="#intro">1. Introducción y Responsable</a></li>
+          <li><a href="#datos">2. Información que Recopilamos</a></li>
+          <li><a href="#finalidad">3. Uso de la Información</a></li>
+          <li><a href="#terceros">4. Servicios de Terceros</a></li>
+          <li><a href="#seguridad">5. Seguridad y Almacenamiento</a></li>
+          <li><a href="#eliminacion">6. Eliminación de Cuenta y Datos</a></li>
+          <li><a href="#menores">7. Privacidad de Menores</a></li>
+          <li><a href="#derechos">8. Tus Derechos Legales</a></li>
+          <li><a href="#cambios">9. Cambios a esta Política</a></li>
+          <li><a href="#contacto">10. Canales de Contacto</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-card">
+
+      <!-- 1. Introducción -->
+      <section id="intro">
+        <h2>1. Introducción y Responsable</h2>
+        <p>
+          Bienvenido a <strong>TERNA!</strong> (en adelante, la "Aplicación" o el "Juego"), un videojuego de cartas multijugador online inspirado en la cultura, fauna y paisajes colombianos.
+        </p>
+        <p>
+          La presente Política de Privacidad describe cómo el equipo de desarrollo de TERNA! recopila, utiliza, almacena y protege la información de los usuarios que descargan, instalan o juegan a TERNA! en dispositivos móviles o plataformas web compatibles.
+        </p>
+        <div class="alert-box alert-info">
+          <strong>Compromiso de Privacidad:</strong> En TERNA! valoramos tu privacidad. Solo recopilamos los datos estrictamente necesarios para operar las partidas multijugador en tiempo real, guardar tu progreso y garantizar un entorno de juego justo y seguro.
+        </div>
+      </section>
+
+      <!-- 2. Información que Recopilamos -->
+      <section id="datos">
+        <h2>2. Información que Recopilamos</h2>
+        <p>Recopilamos únicamente las siguientes categorías de datos cuando utilizas el Juego:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Datos Específicos</th>
+                <th>Propósito Principal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Perfil del Jugador</strong></td>
+                <td>
+                  • Nombre público o apodo (<em>displayName</em>)<br>
+                  • Avatar seleccionado (fauna colombiana o foto de perfil de Google si vinculas tu cuenta)<br>
+                  • Identificador anónimo de usuario (UID)
+                </td>
+                <td>Identificarte ante otros jugadores en las salas de espera, partidas en curso y tablas de clasificación.</td>
+              </tr>
+              <tr>
+                <td><strong>Autenticación</strong></td>
+                <td>
+                  • Modo Invitado: Token anónimo efímero.<br>
+                  • Cuenta de Google: Correo electrónico y nombre asociado (gestionado de forma segura mediante Firebase Auth).
+                </td>
+                <td>Permitir el acceso a tu cuenta, mantener tu sesión activa y sincronizar tu progreso entre dispositivos.</td>
+              </tr>
+              <tr>
+                <td><strong>Progreso y Estadísticas</strong></td>
+                <td>
+                  • Nivel de jugador y experiencia (XP)<br>
+                  • Monedas virtuales de juego (sin valor monetario real)<br>
+                  • Historial de partidas, victorias, ternas y estadísticas por modo
+                </td>
+                <td>Guardar tu avance, balancear el emparejamiento (matchmaking) y calcular recompensas de juego.</td>
+              </tr>
+              <tr>
+                <td><strong>Datos de Partida y Red</strong></td>
+                <td>
+                  • Estado de presencia en línea (<em>online / lastSeen</em>)<br>
+                  • Acciones de juego en vivo (cartas pedidas, ternas bajadas, tiempo de turno)<br>
+                  • Identificador de sala o partida activa
+                </td>
+                <td>Sincronizar las jugadas en tiempo real entre los participantes mediante servidores autoritativos.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert-box alert-warning">
+          <strong>Lo que NO recopilamos:</strong> TERNA! <u>no</u> solicita ni recopila ubicación geográfica precisa por GPS, lista de contactos, libreta de direcciones, archivos personales, mensajes privados externos, ni información financiera como números de tarjetas de crédito o cuentas bancarias.
+        </div>
+      </section>
+
+      <!-- 3. Finalidad del Tratamiento -->
+      <section id="finalidad">
+        <h2>3. Finalidad del Tratamiento de los Datos</h2>
+        <p>Los datos recopilados se utilizan exclusivamente para:</p>
+        <ul>
+          <li><strong>Proveer la experiencia multijugador:</strong> Conectar a los jugadores en salas públicas o privadas mediante códigos de invitación y emparejamiento rápido.</li>
+          <li><strong>Garantizar el juego limpio:</strong> Procesar las jugadas en un servidor autoritativo (Firebase Cloud Functions) para evitar manipulaciones, trampas o alteraciones de cartas y monedas.</li>
+          <li><strong>Persistencia de perfil:</strong> Guardar tu nivel, logros, avatares desbloqueados y estadísticas de rendimiento.</li>
+          <li><strong>Soporte técnico y estabilidad:</strong> Diagnosticar fallos de desconexión o sincronización durante las partidas.</li>
+        </ul>
+      </section>
+
+      <!-- 4. Terceros y Proveedores de Servicios -->
+      <section id="terceros">
+        <h2>4. Servicios de Terceros</h2>
+        <p>
+          Para ofrecer un servicio online de alta disponibilidad y baja latencia, TERNA! se apoya en la infraestructura en la nube de <strong>Google Cloud Platform</strong> y <strong>Google Firebase</strong>. Los siguientes servicios de terceros pueden procesar datos bajo sus propios estándares de seguridad:
+        </p>
+        <ul>
+          <li>
+            <strong>Firebase Authentication:</strong> Gestión de inicio de sesión seguro (modo anónimo e integración con Google Sign-In).
+          </li>
+          <li>
+            <strong>Firebase Cloud Firestore y Realtime Database:</strong> Base de datos en la nube para persistencia de perfiles y sincronización de eventos de juego en tiempo real (alojado en región segura <code>us-central1</code>).
+          </li>
+          <li>
+            <strong>Google Play Services:</strong> Servicios de plataforma para la distribución de la app y autenticación en dispositivos Android.
+          </li>
+        </ul>
+        <p>
+          Puedes consultar la política de privacidad de Google y Firebase en: 
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">https://policies.google.com/privacy</a>.
+        </p>
+      </section>
+
+      <!-- 5. Seguridad y Almacenamiento -->
+      <section id="seguridad">
+        <h2>5. Seguridad y Almacenamiento</h2>
+        <p>
+          Implementamos medidas de seguridad técnicas y organizativas para proteger tus datos contra accesos no autorizados, alteración o pérdida:
+        </p>
+        <ul>
+          <li>Todas las comunicaciones entre la aplicación y los servidores están cifradas mediante el protocolo <strong>HTTPS/TLS</strong> y WebSockets seguros.</li>
+          <li>Reglas estrictas de seguridad del lado del servidor (<em>Security Rules</em>) garantizan que ningún usuario pueda leer ni modificar datos privados de otros jugadores.</li>
+          <li>Las cartas de tu mano permanecen privadas mediante un canal restringido al que solo tiene acceso tu propio usuario y el servidor central.</li>
+        </ul>
+      </section>
+
+      <!-- 6. Eliminación de Cuenta y Datos -->
+      <section id="eliminacion">
+        <h2>6. Eliminación de Cuenta y Retención de Datos</h2>
+        <p>
+          En cumplimiento con los requerimientos de <strong>Google Play Store</strong> y normativas internacionales de protección de datos, tienes derecho a solicitar la eliminación total y permanente de tu cuenta y de todos los datos asociados en cualquier momento.
+        </p>
+
+        <div class="steps-card">
+          <h3 style="margin-top:0;">Cómo solicitar el borrado de tu cuenta y datos:</h3>
+          
+          <div class="step-item">
+            <div class="step-number">A</div>
+            <div class="step-text">
+              <strong>Desde la propia aplicación:</strong> Ve a <em>Ajustes ⚙️</em> → <em>Perfil</em> → selecciona <strong>"Eliminar Cuenta"</strong> y confirma la acción. Tu perfil, historial, monedas y credenciales se borrarán automáticamente de nuestros servidores.
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">B</div>
+            <div class="step-text">
+              <strong>Por correo electrónico:</strong> Si ya desinstalaste la aplicación, puedes enviar un correo a <a href="mailto:soporte.terna.game@gmail.com">soporte.terna.game@gmail.com</a> con el asunto <code>Solicitud de Eliminación de Cuenta - TERNA</code>, indicando tu apodo de jugador o correo asociado. Procesaremos la baja definitiva en un plazo máximo de 48 horas hábiles.
+            </div>
+          </div>
+        </div>
+
+        <p>
+          <strong>Efectos del borrado:</strong> Se eliminarán de forma irreversible tu perfil de Firestore, UID de autenticación, historial de partidas, monedas acumuladas y estadísticas. Las salas efímeras en las que hayas participado se limpian automáticamente tras terminar la partida.
+        </p>
+      </section>
+
+      <!-- 7. Privacidad de Menores -->
+      <section id="menores">
+        <h2>7. Privacidad de Menores de Edad</h2>
+        <p>
+          TERNA! es un juego familiar de cartas apto para todo público. No recopilamos conscientemente información personal identificable de menores de 13 años (o la edad mínima legal aplicable en su jurisdicción) sin el consentimiento previo y verificable de sus padres o tutores legales.
+        </p>
+        <p>
+          Si un padre, madre o tutor tiene conocimiento de que su hijo nos ha proporcionado datos personales sin su autorización, puede contactarnos inmediatamente a <a href="mailto:soporte.terna.game@gmail.com">soporte.terna.game@gmail.com</a> para proceder a la eliminación inmediata de dicha información.
+        </p>
+      </section>
+
+      <!-- 8. Tus Derechos Legales -->
+      <section id="derechos">
+        <h2>8. Tus Derechos (Habeas Data, GDPR, CCPA)</h2>
+        <p>Dependiendo de tu país de residencia, cuentas con los siguientes derechos sobre tus datos personales:</p>
+        <ul>
+          <li><strong>Derecho de Acceso:</strong> Conocer qué datos personales tenemos almacenados sobre ti.</li>
+          <li><strong>Derecho de Rectificación:</strong> Modificar tu apodo (displayName) o avatar en cualquier momento desde la pantalla de Perfil.</li>
+          <li><strong>Derecho de Supresión (Cancelación):</strong> Solicitar el borrado íntegro de tu información y cuenta.</li>
+          <li><strong>Derecho de Oposición:</strong> Negarte al tratamiento de datos específicos que no sean esenciales para el funcionamiento básico del juego.</li>
+          <li><strong>Legislación Colombiana:</strong> En virtud de la <em>Ley Estatutaria 1581 de 2012</em> de la República de Colombia (Régimen General de Protección de Datos Personales), garantizamos el ejercicio pleno de tu derecho de Hábeas Data.</li>
+        </ul>
+      </section>
+
+      <!-- 9. Cambios a esta Política -->
+      <section id="cambios">
+        <h2>9. Modificaciones a esta Política de Privacidad</h2>
+        <p>
+          Podemos actualizar nuestra Política de Privacidad periódicamente para reflejar mejoras en el juego, nuevas funcionalidades o cambios regulatorios. Cualquier modificación será publicada directamente en esta página con la fecha de "Última actualización" revisada.
+        </p>
+        <p>
+          Te recomendamos revisar este enlace periódicamente. El uso continuado del Juego tras la publicación de cambios implicará la aceptación de los mismos.
+        </p>
+      </section>
+
+      <!-- 10. Contacto -->
+      <section id="contacto">
+        <h2>10. Canales de Contacto</h2>
+        <p>
+          Si tienes dudas, preguntas, sugerencias o deseas ejercer cualquiera de tus derechos de privacidad respecto a <strong>TERNA!</strong>, puedes comunicarte directamente con nuestro equipo de desarrollo:
+        </p>
+        <ul>
+          <li><strong>Proyecto:</strong> TERNA! — Juego de Cartas Online</li>
+          <li><strong>Desarrollador / Responsable:</strong> Juan José Álvarez & Equipo TERNA</li>
+          <li><strong>Correo de Soporte y Privacidad:</strong> <a href="mailto:soporte.terna.game@gmail.com">soporte.terna.game@gmail.com</a></li>
+          <li><strong>Repositorio Oficial:</strong> <a href="https://github.com/juanjoal25/Terna" target="_blank" rel="noopener noreferrer">github.com/juanjoal25/Terna</a></li>
+        </ul>
+        <a class="contact-link" href="mailto:soporte.terna.game@gmail.com?subject=Consulta%20sobre%20Privacidad%20-%20TERNA">
+          ✉️ Enviar Consulta de Privacidad
+        </a>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>© 2026 TERNA! · Todos los derechos reservados.</p>
+    <p style="margin-top: 6px; font-size: 13px;">
+      Inspirado en la cultura y fauna de Colombia · Desarrollado con ❤️ para jugadores de todo el mundo.
+    </p>
+  </footer>
+
+</body>
+</html>
