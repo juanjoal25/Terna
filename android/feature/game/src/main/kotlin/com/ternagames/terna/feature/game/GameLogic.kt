@@ -116,7 +116,7 @@ internal object GameLogic {
      * `mismatch` señala la carta que no coincidía cuando la sala no la muestra: la mesa pinta una carta
      * boca abajo marcada en rojo en su lugar, sin revelar su valor.
      */
-    data class Tray(val cards: List<RevealedCard>, val kind: TrayKind, val mismatch: MismatchPick? = null) {
+    data class Tray(val cards: List<RevealedCard>, val kind: TrayKind, val mismatch: MismatchPick? = null, val by: String? = null) {
         val isEmpty: Boolean get() = cards.isEmpty() && mismatch == null
     }
 
@@ -131,7 +131,7 @@ internal object GameLogic {
                     is MatchEvent.TurnFailed -> return Tray(event.cards, TrayKind.Failed, event.mismatch)
                     is MatchEvent.TurnPassed -> return Tray(event.cards, TrayKind.Passed)
                     is MatchEvent.TurnTimeout -> return Tray(event.cards, TrayKind.TimedOut)
-                    is MatchEvent.SetCompleted -> return Tray(event.cards, TrayKind.Completed)
+                    is MatchEvent.SetCompleted -> return Tray(event.cards, TrayKind.Completed, by = event.player)
                     else -> Unit
                 }
             }

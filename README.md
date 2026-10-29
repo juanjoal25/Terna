@@ -315,7 +315,7 @@ Splash ─▶ Login ─▶ Home ─▶ Crear sala ─┐
 - **`GameLogic`**: decide qué botones mostrar y qué opciones ofrecer (el servidor valida todo de nuevo). Tiene pruebas unitarias.
 - **`GameViewModel`**: estado de la mesa, banners narrados desde el punto de vista de quien mira, diálogos paso a paso, aviso de tiempo agotado escalonado por asiento y manejo de "ocupado".
 - **Acciones del jugador:** *Revelar centro*, *Preguntar* (menor/mayor de alguien), *Pedir carta* (número → a quién), *¡Hacer terna!* y *Pasar turno*. También se puede **tocar a un rival** en la mesa para preguntarle o pedirle una carta directamente.
-- **Feedback:** las cartas se voltean al destaparse, la bandeja se sacude al fallar y celebra las ternas, el rival con el turno late, la barra de tiempo se pone roja al final, aparece "¡TU TURNO!" y el teléfono vibra en los momentos clave.
+- **Feedback:** las cartas vuelan desde donde salen (la mano del rival, el centro o la tuya) hasta la mesa y se voltean en el aire; al empezar se reparten; un foco amarillo viaja entre jugadores al cambiar el turno; al completar una terna las cartas vuelan al montón de quien la hizo con confeti; "-1000 AURA" sube sobre quien la pierde y la pantalla destella en rojo si fallas tú; la bandeja se sacude al fallar; la barra de tiempo se pone roja al final; aparece "¡TU TURNO!"; tus cartas se agrandan al tocarlas; y el teléfono vibra en los momentos clave.
 - **Reloj:** usa la hora estimada del servidor (`.info/serverTimeOffset`); después de que vence el turno ya no se aceptan toques.
 
 ---

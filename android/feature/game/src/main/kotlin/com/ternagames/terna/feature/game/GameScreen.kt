@@ -2,6 +2,19 @@ package com.ternagames.terna.feature.game
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
+import com.ternagames.terna.core.model.MismatchPick
+import kotlinx.coroutines.delay
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -207,6 +220,7 @@ internal fun GameContent(match: MatchState, state: GameUiState, actions: GameAct
     val tray = GameLogic.tray(match, state.serverNow)
     val myTurn = GameLogic.isMyTurn(match, me)
 
+    ProvideTablePositions {
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val h = maxHeight
         val w = maxWidth
@@ -241,6 +255,14 @@ internal fun GameContent(match: MatchState, state: GameUiState, actions: GameAct
             },
             modifier = Modifier.fillMaxSize(),
         )
+
+        // Foco que viaja de un jugador a otro cuando cambia el turno.
+        TurnSpotlight(if (match.finished) null else if (match.turn.player == me) "me" else "rival:${match.turn.player}")
+        // "-1000 AURA" sube desde quien la perdió, y un destello rojo si el fallo es mío.
+        val aura = state.auraHit
+        FloatingText(aura?.first, "-1000 AURA", aura?.second?.let { if (it == me) "me" else "rival:$it" }, TernaColors.Danger)
+        DamageFlash(state.myFailure)
+    }
     }
 }
 
@@ -330,6 +352,7 @@ private fun Opponent(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .trackPosition("rival:${player.uid}")
                 .scale(if (active) 1f + 0.03f * pulse else 1f)
                 .clip(shape)
                 .background(Panel)
@@ -349,7 +372,8 @@ private fun Opponent(
         val cardW = backH * CARD_ASPECT_RATIO
         val step = min(cardW.value * 0.6f, 120f / max(1, player.handCount))
         Box(Modifier.height(backH).width((cardW.value + step * max(0, player.handCount - 1)).dp)) {
-            repeat(player.handCount) { i -> PlayingCard(null, backH, Modifier.offset(x = (step * i).dp)) }
+            // Al empezar, las cartas del rival se reparten una a una.
+            repeat(player.handCount) { i -> PopIn(Modifier.offset(x = (step * i).dp), delayMs = 120L + i * 45L) { PlayingCard(null, backH) } }
         }
         if (player.sets.isNotEmpty()) {
             Spacer(Modifier.height(2.dp))
@@ -386,7 +410,7 @@ private fun Table(match: MatchState, state: GameUiState, tray: GameLogic.Tray, a
         }
 
         // Cartas destapadas este turno, a la derecha del centro.
-        Tray(tray, match, trayH, Modifier.align(Alignment.TopEnd).padding(end = 14.dp, top = 2.dp))
+        Tray(tray, match, trayH, state.myUid, Modifier.align(Alignment.TopEnd).padding(end = 14.dp, top = 2.dp))
 
         BannerView(state, Modifier.align(Alignment.TopCenter).padding(top = 2.dp))
     }
@@ -441,7 +465,7 @@ private fun CenterGrid(
                     val value = faceUp[slot]
                     val pickable = selecting && hidden && value == null
                     // Un hueco vacío conserva su sitio: así se puede recordar dónde estaba cada carta.
-                    Box(Modifier.size(cardW, cardH)) {
+                    Box(Modifier.size(cardW, cardH).trackPosition("center:$slot")) {
                         if (hidden || value != null) {
                             val outline = when {
                                 mismatchSlot == slot -> TernaColors.Danger
@@ -465,7 +489,7 @@ private fun CenterGrid(
 }
 
 @Composable
-private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, modifier: Modifier) {
+private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, me: String, modifier: Modifier) {
     if (tray.isEmpty) return
     val chase = GameLogic.failedChase(tray)
     val color = when (tray.kind) {
@@ -484,8 +508,40 @@ private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, modifier: M
     val celebrate by rememberPulse(1f, 1.07f, 420)
     val grow = if (tray.kind == GameLogic.TrayKind.Completed) celebrate else 1f
 
+    // Al completarse la terna, las cartas se quedan un instante celebrando y luego vuelan al montón de quien la hizo.
+    val positions = LocalTablePositions.current
+    val exit = remember { Animatable(0f) }
+    var bounds by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(tray.kind, match.seq) {
+        if (tray.kind == GameLogic.TrayKind.Completed) {
+            delay(800)
+            exit.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+        } else {
+            exit.snapTo(0f)
+        }
+    }
+    val destinations = if (tray.by == me) listOf("sets:me", "me") else listOf("rival:${tray.by}")
+
     // Cada fallo sacude la bandeja una vez (el `seq` solo cambia con una jugada nueva).
-    Shaking(trigger = if (tray.kind == GameLogic.TrayKind.Failed) match.seq else null, modifier = modifier.scale(grow)) {
+    Shaking(
+        trigger = if (tray.kind == GameLogic.TrayKind.Failed) match.seq else null,
+        modifier = modifier
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .graphicsLayer {
+                val p = exit.value
+                val from = bounds
+                val to = destinations.firstNotNullOfOrNull { positions[it] }
+                if (p > 0f && from != null && to != null) {
+                    translationX = (to.center.x - from.center.x) * p
+                    translationY = (to.center.y - from.center.y) * p
+                    val s = 1f - 0.75f * p
+                    scaleX = s
+                    scaleY = s
+                    alpha = 1f - p * p
+                }
+            }
+            .scale(grow),
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 label,
@@ -497,10 +553,11 @@ private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, modifier: M
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 tray.cards.forEachIndexed { i, card ->
                     key("${card.owner}|${card.end}|${card.slot}|${card.value}|$i") {
-                        PopIn {
+                        // La carta viaja desde donde estaba (la mano del rival, el centro o la tuya) y se voltea en el aire.
+                        FlyIn(from = sourceOf(card, me)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 val shape = RoundedCornerShape(6.dp)
-                                RevealingCard(card.value, cardH, Modifier.border(2.dp, color, shape).shadow(4.dp, shape))
+                                RevealingCard(card.value, cardH, Modifier.border(2.dp, color, shape).shadow(4.dp, shape), delayMs = 220)
                                 Text(cardCaption(card, match), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TernaColors.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 60.dp))
                             }
                         }
@@ -508,7 +565,7 @@ private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, modifier: M
                 }
                 tray.mismatch?.let { pick ->
                     key("mismatch") {
-                        PopIn(delayMs = 120) {
+                        FlyIn(from = sourceOf(pick, me), delayMs = 120) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 MismatchCard(cardH)
                                 val where = if (pick.fromCenter) "Centro" else "${match.nameOf(pick.owner.orEmpty())} · ${if (pick.end == HandEnd.High) "mayor" else "menor"}"
@@ -520,6 +577,19 @@ private fun Tray(tray: GameLogic.Tray, match: MatchState, cardH: Dp, modifier: M
             }
         }
     }
+}
+
+/** De dónde salió una carta, como clave del registro de posiciones. */
+private fun sourceOf(card: RevealedCard, me: String): String = when {
+    card.fromCenter -> "center:${card.slot}"
+    card.owner == me -> "me"
+    else -> "rival:${card.owner}"
+}
+
+private fun sourceOf(pick: MismatchPick, me: String): String = when {
+    pick.fromCenter -> "center:${pick.slot}"
+    pick.owner == me -> "me"
+    else -> "rival:${pick.owner}"
 }
 
 /** La carta que no coincidía: boca abajo y marcada. Nadie ve su número. */
@@ -590,11 +660,13 @@ private fun MyHand(match: MatchState, state: GameUiState, cardH: Dp, screenW: Dp
     val step = if (hand.size <= 1) 0.dp else min(cardW.value * 0.72f, (fanW - cardW).value / (hand.size - 1)).dp
     val totalW = cardW + step * max(0, hand.size - 1)
     val mid = (hand.size - 1) / 2f
+    var selected by remember { mutableStateOf<Int?>(null) }
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .trackPosition("me")
                 .clip(RoundedCornerShape(8.dp))
                 .background(PanelSoft)
                 .border(1.dp, Color(0x66FDE047), RoundedCornerShape(8.dp))
@@ -609,7 +681,8 @@ private fun MyHand(match: MatchState, state: GameUiState, cardH: Dp, screenW: Dp
             hand.forEachIndexed { i, value ->
                 // Cada carta conserva su identidad (número + nº de copia): al salir una, las demás se deslizan en vez de cambiar de valor.
                 val copy = hand.take(i).count { it == value }
-                key(value * 10 + copy) {
+                val cardKey = value * 10 + copy
+                key(cardKey) {
                     val lift = abs(i - mid) * abs(i - mid) * 0.8f
                     HandCard(
                         value = value,
@@ -618,6 +691,10 @@ private fun MyHand(match: MatchState, state: GameUiState, cardH: Dp, screenW: Dp
                         y = HAND_TOP_ROOM + lift.dp,
                         tilt = (i - mid) * 3.2f,
                         highlighted = chase != null && value == chase,
+                        dealDelay = 250L + i * 90L,
+                        dealFromX = totalW / 2 - cardW / 2 + 4.dp,
+                        selected = selected == cardKey,
+                        onClick = { selected = if (selected == cardKey) null else cardKey },
                     )
                     if (hand.size > 1 && i == 0) EndBadge("MENOR", Modifier.offset(x = step * i + 4.dp + cardW / 2 - 20.dp, y = HAND_TOP_ROOM + lift.dp - 14.dp))
                     if (hand.size > 1 && i == hand.lastIndex) EndBadge("MAYOR", Modifier.offset(x = step * i + 4.dp + cardW / 2 - 20.dp, y = HAND_TOP_ROOM + lift.dp - 14.dp))
@@ -627,18 +704,54 @@ private fun MyHand(match: MatchState, state: GameUiState, cardH: Dp, screenW: Dp
     }
 }
 
+/**
+ * Una carta de mi mano. Al empezar se reparte desde el centro (una tras otra); si se busca su número se levanta
+ * y brilla; al tocarla se agranda para verla mejor.
+ */
 @Composable
-private fun HandCard(value: Int, cardH: Dp, x: Dp, y: Dp, tilt: Float, highlighted: Boolean) {
-    val animX by animateDpAsState(x, spring(stiffness = Spring.StiffnessMediumLow), label = "handX")
-    val animY by animateDpAsState(if (highlighted) y - 10.dp else y, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "handY")
-    val animTilt by animateFloatAsState(tilt, spring(stiffness = Spring.StiffnessMediumLow), label = "handTilt")
+private fun HandCard(
+    value: Int,
+    cardH: Dp,
+    x: Dp,
+    y: Dp,
+    tilt: Float,
+    highlighted: Boolean,
+    dealDelay: Long,
+    dealFromX: Dp,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    var dealt by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(dealDelay)
+        dealt = true
+    }
+    val targetX = if (dealt) x else dealFromX
+    val targetY = when {
+        !dealt -> -(cardH * 0.9f)
+        selected -> y - 34.dp
+        highlighted -> y - 10.dp
+        else -> y
+    }
+    val animX by animateDpAsState(targetX, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow), label = "handX")
+    val animY by animateDpAsState(targetY, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "handY")
+    val animTilt by animateFloatAsState(if (dealt && !selected) tilt else 0f, spring(stiffness = Spring.StiffnessMediumLow), label = "handTilt")
+    val scale by animateFloatAsState(if (selected) 1.2f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "handScale")
+    val appear by animateFloatAsState(if (dealt) 1f else 0f, tween(200), label = "handAppear")
     val pulse = if (highlighted) rememberPulse(0.45f, 1f, 600).value else 1f
     PlayingCard(
         value = value,
         height = cardH,
         modifier = Modifier
+            .zIndex(if (selected) 10f else 0f)
             .offset(x = animX, y = animY)
+            .graphicsLayer {
+                alpha = appear
+                scaleX = scale
+                scaleY = scale
+            }
             .rotate(animTilt)
+            .clickable(role = Role.Button, onClickLabel = "Ver esta carta más grande", onClick = onClick)
             .then(if (highlighted) Modifier.border(3.dp, TernaColors.Yellow.copy(alpha = pulse), RoundedCornerShape(7.dp)) else Modifier),
     )
 }
@@ -658,7 +771,7 @@ private fun EndBadge(text: String, modifier: Modifier) {
 private fun SetsPile(me: MatchPlayer?, setSize: Int, cardH: Dp) {
     val sets = me?.sets.orEmpty()
     if (sets.isEmpty()) return
-    Column {
+    Column(Modifier.trackPosition("sets:me")) {
         Text(
             "${sets.size} ${if (sets.size == 1) "Terna completada" else "Ternas completadas"}",
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -697,6 +810,13 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
     val urgent = secondsLeft <= 5 && !waiting
     val fraction = if (waiting) 1f else millisLeft / (match.turnSeconds * 1000f).coerceAtLeast(1f)
     val pulse by rememberPulse(0.4f, 1f, 700)
+    val bump = remember { Animatable(0f) }
+    LaunchedEffect(state.myTurnAlert) {
+        if (state.myTurnAlert > 0) {
+            bump.snapTo(1f)
+            bump.animateTo(0f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow))
+        }
+    }
     val chase = GameLogic.chaseValue(match)
     val borderColor = if (myTurn && enabled) TernaColors.Yellow.copy(alpha = 0.5f + 0.5f * pulse) else TernaColors.Yellow.copy(alpha = 0.45f)
 
@@ -715,6 +835,7 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
 
     Column(
         modifier = modifier
+            .graphicsLayer { translationY = -bump.value * 14.dp.toPx() }
             .width(240.dp)
             .shadow(8.dp, shape)
             .clip(shape)
@@ -798,13 +919,15 @@ private fun GameButton(
         outlined -> TernaColors.Yellow
         else -> TernaColors.OnYellow
     }
+    val animBackground by animateColorAsState(background, tween(200), label = "buttonBg")
+    val animText by animateColorAsState(textColor, tween(200), label = "buttonText")
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .scale(press * pulse)
             .defaultMinSize(minHeight = 38.dp)
             .clip(shape)
-            .background(background)
+            .background(animBackground)
             .then(if (outlined && enabled) Modifier.border(2.dp, TernaColors.Yellow, shape) else Modifier)
             .clickable(
                 interactionSource = interaction,
@@ -821,7 +944,7 @@ private fun GameButton(
         Text(
             text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
-            color = textColor,
+            color = animText,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )

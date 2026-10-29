@@ -317,8 +317,9 @@ private fun Standings(match: MatchState, result: GameResult, me: String) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxWidth().heightIn(max = 104.dp).verticalScroll(rememberScrollState()),
     ) {
-        ranking.forEach { p ->
+        ranking.forEachIndexed { index, p ->
             val winner = p.uid in result.winners
+            PopIn(Modifier.fillMaxWidth(), delayMs = 200L + index * 110L) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -342,6 +343,7 @@ private fun Standings(match: MatchState, result: GameResult, me: String) {
                     color = if (winner) TernaColors.Yellow else TernaColors.TextMuted,
                 )
                 if (winner) Text(" 👑", fontSize = 14.sp)
+            }
             }
         }
     }

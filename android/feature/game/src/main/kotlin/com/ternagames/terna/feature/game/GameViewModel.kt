@@ -70,6 +70,10 @@ data class GameUiState(
     val soundEffect: Pair<Long, TernaSfx>? = null,
     /** Sube cada vez que el turno pasa a ser mío: la pantalla muestra "¡Tu turno!" y vibra. */
     val myTurnAlert: Long = 0,
+    /** Se perdió aura: (contador, uid de a quien se le pidió). La mesa muestra "-1000 AURA" sobre esa persona. */
+    val auraHit: Pair<Long, String>? = null,
+    /** Sube cada vez que fallo yo (turno fallado, aura o tiempo agotado): destello rojo. */
+    val myFailure: Long = 0,
     val message: String? = null,
     val exit: GameExit? = null,
     /** La partida no existe o ya no se puede ver. */
@@ -97,6 +101,8 @@ class GameViewModel @Inject constructor(
     private var bannerCounter = 0L
     private var sfxCounter = 0L
     private var alertCounter = 0L
+    private var auraCounter = 0L
+    private var failCounter = 0L
     private var reportedTimeoutSeq = -1L
 
     init {
@@ -145,6 +151,8 @@ class GameViewModel @Inject constructor(
                 selectingCenter = if (turnChanged || match.finished) false else s.selectingCenter,
                 soundEffect = sfx?.let { (++sfxCounter) to it } ?: s.soundEffect,
                 myTurnAlert = if (myTurnStarted) ++alertCounter else s.myTurnAlert,
+                auraHit = fresh.filterIsInstance<MatchEvent.ClaimFailed>().lastOrNull()?.let { (++auraCounter) to it.target } ?: s.auraHit,
+                myFailure = if (fresh.any { (it is MatchEvent.TurnFailed && it.player == myUid) || (it is MatchEvent.ClaimFailed && it.player == myUid) || (it is MatchEvent.TurnTimeout && it.player == myUid) }) ++failCounter else s.myFailure,
             )
         }
         bannerFor(fresh, match)?.let(::showBanner)
