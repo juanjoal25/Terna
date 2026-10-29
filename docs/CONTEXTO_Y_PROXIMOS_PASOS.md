@@ -154,7 +154,7 @@ openRooms/{roomId}        índice de salas públicas con puestos
 roomCodes/{TRN-XXXX}      código → roomId
 active/{uid}              {roomId} de la sala en la que está cada usuario (reanudar al abrir)
 matches/{matchId}/
-   meta                   roomId, ruleSet, estado, turnSeconds, setSize, allowPass, allowClaim, allowSelfReveal, minRevealsBeforePass, claimOncePerTurn, hideMismatch, allowMultiClaim
+   meta                   roomId, ruleSet, estado, turnSeconds, setSize, allowPass, allowClaim, allowSelfReveal, minRevealsBeforePass, askOncePerTurn, hideMismatch, allowMultiClaim
    players/{uid}          seat, name, avatar, isBot, connected, handCount, sets
    live                   seq, turn{player, number, startsAt, deadline}, revealed, center[bool], lastEvents, result
    hands/{uid}            mano privada (solo la lee su dueño)
@@ -239,7 +239,7 @@ Todas exigen sesión. Errores en `details.reason` (p. ej. `ROOM_FULL`, `NOT_YOUR
 | 12 | **Reglas como `TurnOptions` configurables** | Reglas fijas | "Flexible y divertido"; permite casas de reglas y comparar con Trio original |
 | 13 | **"Pasar turno" activado, con mínimo 1 carta destapada** (antes apagado) | Siempre disponible / apagado | Con la carta equivocada oculta y una pregunta por rival, ya no regala información; y sin jugadas posibles siempre se puede pasar |
 | 16 | **La carta que no coincide no se muestra** (`hideMismatch`) | Mostrar todas, como en Trio | Se pedía "que no se dé tanta información tan rápido"; sigue siendo opción de sala |
-| 17 | **"Pedir carta" una vez por turno** (`claimOncePerTurn`) y **sin pedir varias a la vez** (`allowMultiClaim` apagado) | Límite por rival | Cada jugada saca una carta: con dos iguales seguidas se pregunta dos veces. (Se probó "una pregunta por rival" y se descartó: el equipo quería poder preguntar dos veces a quien tiene dos iguales) |
+| 17 | **"Preguntar" (revelar la mano de un rival) una vez por turno** (`askOncePerTurn`) y **sin pedir varias a la vez** (`allowMultiClaim` apagado) | Límite por rival / límite en "Pedir carta" | Cada jugada saca una carta; con dos iguales seguidas se le pide el número dos veces. (Se probó límite por rival y límite en "Pedir carta"; el equipo aclaró que el límite es de "Preguntar") |
 | 14 | **Perfil fuera de mi alcance** | — | Lo desarrolla otro compañero; evita conflictos |
 | 15 | **Variantes `prod` desactivadas sin `google-services.json`** | Compilar siempre | "Build APK(s)" fallaba sin ese archivo |
 
@@ -268,8 +268,8 @@ Afirmar que un rival tiene el número N como carta **menor o mayor** (entre las 
 Pedido del equipo: que no se obtenga tanta información de la partida tan rápido en cada turno.
 
 1. **Carta equivocada oculta** (`hideMismatch`). Al destapar algo que no coincide con el número perseguido, el motor no publica su valor: emite `TURN_FAILED { revealed: [las que sí coincidían], mismatch: {dónde} }`. Solo la primera carta del turno se ve siempre. La app pinta una carta boca abajo marcada en rojo y avisa *"No es la carta correcta: …"*.
-2. **"Pedir carta" una vez por turno** (`claimOncePerTurn`). `turn.claimUsed` lleva la cuenta (una deducción fallida también cuenta); se reinicia al cambiar el turno o al completar una terna con `continueAfterSet`. Repetir responde `CLAIM_ALREADY_USED`. **"Preguntar" (revelar) no tiene límite**, también con la misma persona: si un rival tiene dos cartas iguales seguidas, se le pregunta dos veces.
-3. **Sin pedir varias de golpe** (`allowMultiClaim` apagado): `count > 1` responde `INVALID_COUNT`. El código de `count` sigue en el motor por si una sala lo activa. Con `claimOncePerTurn` y sin `count`, la deducción deja de ser una forma rápida de vaciar una mano.
+2. **"Preguntar" una vez por turno** (`askOncePerTurn`): `REVEAL_HAND` sobre un rival. `turn.askUsed` lleva la cuenta; se reinicia al cambiar el turno o al completar una terna con `continueAfterSet`. Repetir responde `ASK_ALREADY_USED`. Revelar tu propia mano no cuenta (hace falta para "¡Hacer terna!"). **"Pedir carta" no tiene límite**, también con la misma persona: si un rival tiene dos cartas iguales seguidas, se le pide el número dos veces.
+3. **Sin pedir varias de golpe** (`allowMultiClaim` apagado): `count > 1` responde `INVALID_COUNT`. El código de `count` sigue en el motor por si una sala lo activa. Sin `count`, pedir carta no sirve para vaciar una mano de golpe.
 4. **Carta en el medio**: ya no se podía sacar (solo cuentan la menor y la mayor); ahora el aviso lo dice con claridad y hay pruebas explícitas.
 5. **Pasar turno activado** (mínimo 1 carta destapada) y siempre visible en el panel, con el motivo cuando está apagado. Si no queda ninguna jugada (`isDeadEnd`) se puede pasar siempre, aunque la sala lo tenga apagado.
 6. **Terna automática con la propia mano** (sin cambios): tras destapar una carta, si tus cartas iguales seguidas en un extremo completan la terna, el servidor las destapa solo.
@@ -564,7 +564,7 @@ Es lo que convierte el juego en jugable sin 3 humanos y habilita la **Partida r�
 | `UNAUTHENTICATED` | Tu sesión expiró. Vuelve a iniciar sesión. |
 | otros | Algo salió mal. Inténtalo de nuevo. |
 
-También tienen mensaje: `CLAIM_ALREADY_USED` ("Solo puedes pedir una carta por turno…"), `PASS_TOO_EARLY`, `PASS_DISABLED`, `CLAIM_VALUE_MISMATCH`, `INVALID_COUNT` y `NO_HIDDEN_CARDS`.
+También tienen mensaje: `ASK_ALREADY_USED` ("Solo puedes preguntar una vez por turno…"), `PASS_TOO_EARLY`, `PASS_DISABLED`, `CLAIM_VALUE_MISMATCH`, `INVALID_COUNT` y `NO_HIDDEN_CARDS`.
 
 Códigos solo del motor/servidor que aún no tienen mensaje propio: `NOT_TIMED_OUT`, `INVALID_ACTION`, `INVALID_SLOT`, `SLOT_EMPTY`, `SLOT_ALREADY_REVEALED`.
 

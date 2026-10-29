@@ -1,4 +1,4 @@
-import { claimBlocked, currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, isDeadEnd, ownCardsToComplete, planHandCards } from "./queries.js";
+import { askBlocked, currentTurnValue, hasHiddenCards, hasOtherSources, hiddenCount, hiddenEndIndex, isDeadEnd, ownCardsToComplete, planHandCards } from "./queries.js";
 import type {
   Action,
   ApplyResult,
@@ -77,6 +77,11 @@ function revealHand(state: GameState, out: Emitter, target: PlayerId, end: HandE
   }
   const index = hiddenEndIndex(state, target, end);
   if (index === null) return "NO_HIDDEN_CARDS";
+  // Preguntar a un rival solo se puede una vez por turno. Revelar tu propia mano no cuenta (hace falta para cerrar la terna).
+  if (target !== state.turn.player) {
+    if (askBlocked(state)) return "ASK_ALREADY_USED";
+    if (state.ruleSet.options.askOncePerTurn) state.turn.askUsed = true;
+  }
 
   const value = state.hands[target]![index]!;
   resolveReveal(state, out, { source: "HAND", owner: target, index, end, value, claimed: false });
@@ -100,7 +105,6 @@ function revealCenter(state: GameState, out: Emitter, slot: number): EngineError
 function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, end: HandEnd | undefined, count: number): EngineErrorCode | null {
   const { options, maxNumber, setSize } = state.ruleSet;
   if (!options.allowClaim) return "CLAIM_DISABLED";
-  if (claimBlocked(state)) return "CLAIM_ALREADY_USED";
   if (!state.players.includes(target)) return "UNKNOWN_PLAYER";
   if (target === state.turn.player) return "CLAIM_SELF";
   if (!Number.isInteger(value) || value < 1 || value > maxNumber) return "INVALID_VALUE";
@@ -116,7 +120,6 @@ function claim(state: GameState, out: Emitter, target: PlayerId, value: Card, en
   }
   // Sin "varias de golpe", cada petición saca una sola carta: las demás hay que descubrirlas después.
   if (count > 1 && !options.allowMultiClaim) return "INVALID_COUNT";
-  if (options.claimOncePerTurn) state.turn.claimUsed = true;
 
   const picks = planHandCards(state, target, value, count, end);
   if (picks) {
@@ -203,7 +206,7 @@ function completeSet(state: GameState, out: Emitter): void {
 
   state.sets[player]!.push(value);
   state.turn.revealed = [];
-  delete state.turn.claimUsed;
+  delete state.turn.askUsed;
   out.emit({ type: "SET_COMPLETED", player, value, cards });
 
   const reason = winReasonAfterSet(state.ruleSet, state.sets[player]!, value);

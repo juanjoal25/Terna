@@ -69,9 +69,9 @@ export function hiddenCenterSlots(state: GameState): number[] {
   return state.center.flatMap((c, slot) => (c !== null && !revealed.has(slot) ? [slot] : []));
 }
 
-/** ¿Ya se usó "Pedir carta" en este turno y la sala solo permite una vez? */
-export function claimBlocked(state: GameState): boolean {
-  return state.ruleSet.options.claimOncePerTurn === true && state.turn.claimUsed === true;
+/** ¿Ya se preguntó a un rival en este turno y la sala solo permite una vez? */
+export function askBlocked(state: GameState): boolean {
+  return state.ruleSet.options.askOncePerTurn === true && state.turn.askUsed === true;
 }
 
 /** Valor que se está persiguiendo este turno, o null si aún no se reveló nada. */
@@ -117,12 +117,14 @@ function moves(state: GameState) {
   const me = state.turn.player;
   const others = state.players.filter((p) => p !== me && hasHiddenCards(state, p));
   const selfAllowed = hasHiddenCards(state, me) && (options.allowSelfReveal || !hasOtherSources(state));
+  const rivals = askBlocked(state) ? [] : others;
   return {
     others,
     selfAllowed,
-    revealTargets: selfAllowed ? [...others, me] : others,
+    // Preguntar a un rival solo una vez por turno; tu propia mano siempre se puede revelar.
+    revealTargets: selfAllowed ? [...rivals, me] : rivals,
     centerSlots: hiddenCenterSlots(state),
-    claimTargets: options.allowClaim && !claimBlocked(state) ? others : [],
+    claimTargets: options.allowClaim ? others : [],
   };
 }
 

@@ -20,7 +20,7 @@ export const ORIGINAL_OPTIONS: TurnOptions = {
   allowPass: false,
   minRevealsBeforePass: 1,
   continueAfterSet: false,
-  claimOncePerTurn: false,
+  askOncePerTurn: false,
   hideMismatch: false,
   allowMultiClaim: false,
 };
@@ -38,7 +38,7 @@ export const TERNA_OPTIONS: TurnOptions = {
   ...ORIGINAL_OPTIONS,
   allowClaim: true,
   allowPass: true,
-  claimOncePerTurn: true,
+  askOncePerTurn: true,
   hideMismatch: true,
 };
 

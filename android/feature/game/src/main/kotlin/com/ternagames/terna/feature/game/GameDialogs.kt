@@ -89,15 +89,15 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
             val chase = GameLogic.chaseValue(match)
             Header(rival?.name ?: "Rival", actions.onDismissDialog)
             Text(
-                "${GameLogic.hiddenCards(match, dialog.target)} cartas ocultas · preguntar no tiene límite",
+                "${GameLogic.hiddenCards(match, dialog.target)} cartas ocultas",
                 style = MaterialTheme.typography.bodySmall,
                 color = TernaColors.TextMuted,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TernaPrimaryButton("CARTA MENOR", { actions.onEnd(dialog.target, HandEnd.Low) }, Modifier.weight(1f))
-                TernaPrimaryButton("CARTA MAYOR", { actions.onEnd(dialog.target, HandEnd.High) }, Modifier.weight(1f))
+                TernaPrimaryButton("CARTA MENOR", { actions.onEnd(dialog.target, HandEnd.Low) }, Modifier.weight(1f), enabled = !GameLogic.askUsedUp(match))
+                TernaPrimaryButton("CARTA MAYOR", { actions.onEnd(dialog.target, HandEnd.High) }, Modifier.weight(1f), enabled = !GameLogic.askUsedUp(match))
             }
             if (match.rules.allowClaim) {
                 Spacer(Modifier.height(8.dp))
@@ -107,14 +107,14 @@ internal fun GameDialogs(match: MatchState, state: GameUiState, actions: GameAct
                     Modifier.fillMaxWidth(),
                     enabled = GameLogic.canClaim(match, me),
                 )
-                Text(
-                    if (GameLogic.claimUsedUp(match)) "Ya pediste una carta en este turno: sigue preguntando o pasa." else "Pedir carta solo se puede una vez por turno.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TernaColors.TextMuted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                )
             }
+            Text(
+                if (GameLogic.askUsedUp(match)) "Ya preguntaste en este turno: ahora puedes pedir carta." else "Preguntar solo se puede una vez por turno; pedir carta no tiene límite.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TernaColors.TextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            )
             MismatchNote(match)
         }
 

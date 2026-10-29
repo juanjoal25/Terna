@@ -183,13 +183,13 @@ describe("jugar", () => {
     expect(events[0]).toMatchObject({ taunt: "AURA_MINUS_1000", target: "carla", value: 5 });
   });
 
-  it("'Pedir carta' solo una vez por turno (`live.claimUsed`), pero se puede seguir preguntando a la misma persona", async () => {
+  it("'Preguntar' solo una vez por turno (`live.askUsed`), pero se puede seguir pidiendo cartas y revelando el centro", async () => {
     const { matchId, seq } = await scripted();
-    const r1 = await act(matchId, "ana", seq, { type: "CLAIM", target: "carla", value: 4 });
-    expect((await matchNode(matchId))!.live.claimUsed).toBe(true);
-    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "CLAIM", target: "beto", value: 4 }))).toBe("CLAIM_ALREADY_USED");
-    // Preguntar (revelar) a la misma persona no tiene límite.
-    await expect(act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "HIGH" })).resolves.toBeTruthy();
+    const r1 = await act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" });
+    expect((await matchNode(matchId))!.live.askUsed).toBe(true);
+    expect(await reasonOf(act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "LOW" }))).toBe("ASK_ALREADY_USED");
+    // Revelar el centro (y pedir carta) no tienen límite.
+    await expect(act(matchId, "ana", r1.seq, { type: "REVEAL_CENTER", slot: 0 })).resolves.toBeTruthy();
   });
 
   it("deducir bien entrega la carta y sigue el turno", async () => {
@@ -246,7 +246,7 @@ describe("jugar", () => {
     await setGame(matchId, game);
 
     const r1 = await act(matchId, "ana", game.seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" });
-    const r2 = await act(matchId, "ana", r1.seq, { type: "REVEAL_HAND", target: "carla", end: "LOW" });
+    const r2 = await act(matchId, "ana", r1.seq, { type: "CLAIM", target: "carla", value: 7 }); // preguntar solo se puede una vez por turno
     expect(r2.finished).toBe(true);
 
     const node = (await matchNode(matchId))!;
@@ -271,7 +271,7 @@ describe("tiempo agotado", () => {
     const { matchId } = await startedMatch(3);
     expect((await matchNode(matchId))!.meta).toMatchObject({
       setSize: 3, allowPass: true, allowClaim: true, allowSelfReveal: true, minRevealsBeforePass: 1,
-      claimOncePerTurn: true, hideMismatch: true, allowMultiClaim: false,
+      askOncePerTurn: true, hideMismatch: true, allowMultiClaim: false,
     });
   });
 
@@ -334,7 +334,8 @@ describe("estadísticas de Firestore", () => {
     const game = fixedGame({ hands: { ana: [7], beto: [7], carla: [7] }, center: [3], first: "ana" });
     await setGame(matchId, game);
     let seq = game.seq;
-    for (const target of ["beto", "carla"]) seq = (await act(matchId, "ana", seq, { type: "REVEAL_HAND", target, end: "LOW" })).seq;
+    seq = (await act(matchId, "ana", seq, { type: "REVEAL_HAND", target: "beto", end: "LOW" })).seq;
+    seq = (await act(matchId, "ana", seq, { type: "CLAIM", target: "carla", value: 7 })).seq;
 
     const user = async (uid: string) => (await firestore.doc(`users/${uid}`).get()).data()!;
     expect((await user("ana")).stats.TERNA_CLASSIC).toEqual({ games: 1, wins: 1, sets: 1, sevensWins: 1, currentStreak: 1, bestStreak: 1 });
@@ -370,13 +371,17 @@ function chooseAction(state: GameState, rng: Rng): Action {
     for (const target of actions.revealTargets) {
       for (const end of ["LOW", "HIGH"] as const) {
         const i = hiddenEndIndex(state, target, end);
-        if (i !== null && state.hands[target]![i] === value) return { type: "REVEAL_HAND", player, target, end };
+        if (i !== null && state.hands[target]![i] === value) {
+          // Preguntar solo se puede una vez por turno: si se sabe el número, se pide (sin límite).
+          return actions.claimTargets.includes(target) ? { type: "CLAIM", player, target, value } : { type: "REVEAL_HAND", player, target, end };
+        }
       }
     }
   }
   const choices: Action[] = [];
   for (const target of actions.revealTargets) for (const end of ["LOW", "HIGH"] as const) choices.push({ type: "REVEAL_HAND", player, target, end });
   for (const slot of actions.centerSlots) choices.push({ type: "REVEAL_CENTER", player, slot });
+  for (const target of actions.claimTargets) choices.push({ type: "CLAIM", player, target, value: value ?? 1 + Math.floor(rng() * 12) });
   if (choices.length === 0) return { type: "PASS", player };
   return choices[Math.floor(rng() * choices.length)]!;
 }

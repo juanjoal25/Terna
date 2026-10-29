@@ -41,7 +41,7 @@ Juego de cartas **multijugador para Android**, basado en el juego de mesa *Trio*
 - **Sala de espera:** ver quién entró, expulsar jugadores (anfitrión), iniciar la partida, salir.
 - **Partida completa en la mesa**, de 3 a 6 jugadores, en redes distintas (todo pasa por la nube):
   revelar menor/mayor de cualquiera (incluido uno mismo), revelar el centro, **"Pedir carta"** (deducir) con la penalización de *"-1000 de aura"*, ternas, victoria por 3 ternas o por la terna de 7 (*Jackpot 777*), temporizador por turno y fin de partida.
-- **Información controlada:** la carta equivocada no se muestra, "Pedir carta" solo una vez por turno, se puede pasar turno y la terna se completa sola con tus propias cartas (ver [§2.4](#24-que-no-se-regale-información)).
+- **Información controlada:** la carta equivocada no se muestra, "Preguntar" solo una vez por turno, se puede pasar turno y la terna se completa sola con tus propias cartas (ver [§2.4](#24-que-no-se-regale-información)).
 - **Historial y estadísticas** guardados en Firestore al terminar cada partida (idempotente: no cuenta dos veces).
 - **Reglas configurables** por sala (casas de reglas) y motor parametrizado para el futuro modo **CUARTA**.
 
@@ -103,8 +103,8 @@ Si se acaban las cartas sin ganador, gana quien tenga más ternas.
 Para que nadie se entere de demasiado en cada turno (todas son opciones de la sala, activadas por defecto):
 
 - **La carta equivocada no se muestra.** Si destapas algo que no es el número que buscas (la menor o la mayor de alguien, o una del centro), no se ve su valor: la mesa solo avisa *"No es la carta correcta: la carta menor de Ana no era el 5"* y pierdes el turno. La primera carta del turno sí se ve siempre, porque es el número que persigues.
-- **"Pedir carta" (deducir) solo una vez por turno**; en cambio **"Preguntar" (revelar la menor o la mayor) no tiene límite**, también con la misma persona.
-- **Una carta por jugada.** Si Beto tiene dos 5 seguidos, le preguntas dos veces y te da una por pregunta; no se piden dos iguales de golpe.
+- **"Preguntar" (revelar la menor o la mayor de un rival) solo una vez por turno**; en cambio **"Pedir carta" (deducir) no tiene límite**, también con la misma persona. Revelar tu propia mano no cuenta.
+- **Una carta por jugada.** Si Beto tiene dos 5 seguidos, le pides el 5 dos veces y te da uno por petición; no se piden dos iguales de golpe.
 - **Una carta en el medio de una mano no se puede sacar**, ni pidiéndola ni revelando: solo cuentan la menor y la mayor. Pedir una que está en el medio es fallar (*-1000 de aura*); cuando salen las de afuera, la del medio pasa a ser extremo.
 - **Terna automática con tu mano.** Si tras destapar una carta (pidiéndola, revelándola o sacándola del centro) tus propias cartas iguales, **seguidas en un extremo de tu mano**, completan la terna, el servidor las destapa solo.
   Ejemplo: tienes `5 5 9`, aciertas el 5 de Beto → terna de 5 al instante.
@@ -124,7 +124,7 @@ Se define por sala con `TurnOptions` (el motor las valida en el servidor):
 | `claimFailEndsTurn` | sí | — | Deducir mal pierde el turno. |
 | `allowPass` / `minRevealsBeforePass` | **sí** / 1 | no | "Pasar turno" tras destapar al menos una carta. Sin jugadas posibles, siempre se puede pasar. |
 | `continueAfterSet` | no | no | Seguir jugando tras una terna. |
-| `claimOncePerTurn` | **sí** | — | "Pedir carta" solo se puede usar una vez por turno (preguntar no tiene límite). |
+| `askOncePerTurn` | **sí** | — | "Preguntar" (revelar la mano de un rival) solo una vez por turno; pedir carta no tiene límite y revelar tu propia mano tampoco cuenta. |
 | `hideMismatch` | **sí** | no | La carta que no coincide no se muestra: solo se avisa. |
 | `allowMultiClaim` | no | — | Permite pedir varias cartas iguales de golpe (`count` > 1). |
 

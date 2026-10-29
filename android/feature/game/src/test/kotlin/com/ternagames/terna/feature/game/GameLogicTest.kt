@@ -28,11 +28,11 @@ class GameLogicTest {
         turnPlayer: String = "ana",
         startsAt: Long = 1_000,
         center: List<Boolean> = listOf(true, true, false),
-        claimUsed: Boolean = false,
+        askUsed: Boolean = false,
     ) = MatchState(
         id = "m1", roomId = "r1", ruleSet = "TERNA_CLASSIC", finished = false, turnSeconds = 20, rules = rules,
         players = listOf(player("ana", 0, myHand.size), player("beto", 1, 3), player("carla", 2, 0)),
-        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, claimUsed = claimUsed, center = center,
+        seq = 5, turn = TurnInfo(turnPlayer, 2, startsAt, startsAt + 20_000), revealed = revealed, askUsed = askUsed, center = center,
         events = events, result = null, myHand = myHand,
     )
 
@@ -123,16 +123,18 @@ class GameLogicTest {
     }
 
     @Test
-    fun `pedir carta solo una vez por turno pero preguntar sigue disponible`() {
-        val reglas = MatchRules(claimOncePerTurn = true)
-        assertTrue(GameLogic.canClaim(match(rules = reglas), "ana"))
-        val usada = match(rules = reglas, claimUsed = true)
-        assertTrue(GameLogic.claimUsedUp(usada))
-        assertFalse(GameLogic.canClaim(usada, "ana"))
-        // Preguntar (revelar) no se toca: se puede repetir con la misma persona.
-        assertEquals(listOf("beto", "ana"), GameLogic.revealTargets(usada, "ana").map { it.uid })
+    fun `preguntar solo una vez por turno pero pedir carta sigue disponible`() {
+        val reglas = MatchRules(askOncePerTurn = true)
+        assertTrue(GameLogic.canAsk(match(rules = reglas), "ana"))
+        val usada = match(rules = reglas, askUsed = true)
+        assertTrue(GameLogic.askUsedUp(usada))
+        assertFalse(GameLogic.canAsk(usada, "ana"))
+        // Pedir carta no tiene límite: sigue disponible, también con la misma persona.
+        assertTrue(GameLogic.canClaim(usada, "ana"))
+        // A los rivales ya no se les puede preguntar; solo queda mi propia mano.
+        assertEquals(listOf("ana"), GameLogic.revealTargets(usada, "ana").map { it.uid })
         // Sin la regla, el aviso del servidor no bloquea nada.
-        assertFalse(GameLogic.claimUsedUp(match(claimUsed = true)))
+        assertFalse(GameLogic.askUsedUp(match(askUsed = true)))
     }
 
     @Test

@@ -47,8 +47,8 @@ export interface TurnOptions {
   minRevealsBeforePass: number;
   /** Si es true, tras completar un set el mismo jugador sigue jugando. */
   continueAfterSet: boolean;
-  /** "Pedir carta" (deducir) solo se puede usar una vez por turno. Preguntar (revelar menor/mayor) no tiene límite. */
-  claimOncePerTurn: boolean;
+  /** "Preguntar" (revelar la menor o la mayor de un rival) solo se puede una vez por turno. Pedir carta no tiene límite; revelar tu propia mano tampoco cuenta. */
+  askOncePerTurn: boolean;
   /** Si es true, la carta que no coincide NO se muestra: solo se avisa de que no era la correcta. */
   hideMismatch: boolean;
   /** Permite pedir varias cartas iguales de una vez a un rival (`count` > 1 en CLAIM). */
@@ -88,8 +88,8 @@ export interface TurnState {
   player: PlayerId;
   number: number;
   revealed: Reveal[];
-  /** Ya se usó "Pedir carta" en este turno (solo se guarda con `claimOncePerTurn`). */
-  claimUsed?: boolean;
+  /** Ya se preguntó a un rival en este turno (solo se guarda con `askOncePerTurn`). */
+  askUsed?: boolean;
 }
 
 /** Dónde estaba la carta que no coincidía. Nunca incluye su valor: no se muestra a nadie. */
@@ -158,7 +158,7 @@ export type EngineErrorCode =
   | "CLAIM_VALUE_MISMATCH"
   | "INVALID_VALUE"
   | "INVALID_COUNT"
-  | "CLAIM_ALREADY_USED"
+  | "ASK_ALREADY_USED"
   | "PASS_DISABLED"
   | "PASS_TOO_EARLY";
 

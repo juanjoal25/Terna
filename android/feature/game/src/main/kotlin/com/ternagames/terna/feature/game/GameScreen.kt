@@ -828,7 +828,7 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
         state.selectingCenter -> "Toca una carta del centro"
         GameLogic.isDeadEnd(match, me) -> "No quedan jugadas: pasa el turno"
         completeEnd != null -> "¡Te falta una carta y la tienes en la mano!"
-        chase != null && GameLogic.claimUsedUp(match) -> "Busca otro $chase · pregunta o pasa el turno"
+        chase != null && GameLogic.askUsedUp(match) -> "Busca otro $chase · pide carta, revela el centro o pasa"
         chase != null -> "Busca otro $chase · pregunta, pide o pasa"
         else -> "Toca a un rival o elige una acción"
     }
@@ -872,7 +872,7 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
                 Modifier.weight(1f),
                 enabled = enabled && GameLogic.canRevealCenter(match),
             )
-            GameButton("PREGUNTAR", actions.onAsk, Modifier.weight(1f), enabled = enabled && GameLogic.revealTargets(match, me).isNotEmpty())
+            GameButton("PREGUNTAR", actions.onAsk, Modifier.weight(1f), enabled = enabled && GameLogic.canAsk(match, me))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             if (match.rules.allowClaim) {
@@ -882,7 +882,7 @@ private fun ActionPanel(match: MatchState, state: GameUiState, myTurn: Boolean, 
         }
         // Por qué un botón está apagado: nada de adivinar.
         val note = if (!enabled) null else listOfNotNull(
-            "Ya pediste una carta en este turno".takeIf { match.rules.allowClaim && GameLogic.claimUsedUp(match) },
+            "Ya preguntaste en este turno".takeIf { GameLogic.askUsedUp(match) },
             GameLogic.passBlockedReason(match, me),
         ).joinToString(" · ").ifEmpty { null }
         if (note != null) {

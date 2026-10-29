@@ -182,7 +182,7 @@ private fun PlayerChip(profile: PlayerProfile?, photoUrl: String?, onClick: () -
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "Nivel ${profile?.level ?: 1}",
+                "${profile?.gamesPlayed ?: 0} jugadas · ${profile?.gamesWon ?: 0} ganadas",
                 style = MaterialTheme.typography.labelSmall,
                 color = TernaColors.Yellow,
                 modifier = Modifier

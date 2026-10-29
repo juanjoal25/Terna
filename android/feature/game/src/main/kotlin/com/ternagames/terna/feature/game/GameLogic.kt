@@ -39,12 +39,16 @@ internal object GameLogic {
     fun otherTargets(match: MatchState, me: String): List<MatchPlayer> =
         match.players.filter { it.uid != me && hiddenCards(match, it.uid) > 0 }
 
-    /** ¿Ya se usó "Pedir carta" en este turno y la sala solo deja una? */
-    fun claimUsedUp(match: MatchState): Boolean = match.rules.claimOncePerTurn && match.claimUsed
+    /** ¿Ya se preguntó a un rival en este turno y la sala solo deja una vez? */
+    fun askUsedUp(match: MatchState): Boolean = match.rules.askOncePerTurn && match.askUsed
 
-    /** "Pedir carta" disponible: la sala lo permite, no se usó ya en este turno y hay a quién pedirle. */
+    /** "Pedir carta" disponible: la sala lo permite y hay a quién pedirle. No tiene límite por turno. */
     fun canClaim(match: MatchState, me: String): Boolean =
-        match.rules.allowClaim && !claimUsedUp(match) && otherTargets(match, me).isNotEmpty()
+        match.rules.allowClaim && otherTargets(match, me).isNotEmpty()
+
+    /** "Preguntar" disponible: no se preguntó ya en este turno y hay a quién (o mi propia mano). */
+    fun canAsk(match: MatchState, me: String): Boolean =
+        !askUsedUp(match) && revealTargets(match, me).isNotEmpty()
 
     /** Cartas que faltan en la mesa para formar la terna. */
     fun remainingToSet(match: MatchState): Int = (match.rules.setSize - match.revealed.size).coerceAtLeast(0)
@@ -57,7 +61,8 @@ internal object GameLogic {
 
     /** Jugadores a los que se les puede revelar su carta mayor o menor; incluye al propio jugador si las reglas lo permiten. */
     fun revealTargets(match: MatchState, me: String): List<MatchPlayer> {
-        val others = otherTargets(match, me)
+        // Preguntar a un rival solo una vez por turno; mi propia mano siempre se puede revelar.
+        val others = if (askUsedUp(match)) emptyList() else otherTargets(match, me)
         val self = match.player(me)?.takeIf { match.rules.allowSelfReveal && hiddenCards(match, me) > 0 }
         return if (self != null) others + self else others
     }

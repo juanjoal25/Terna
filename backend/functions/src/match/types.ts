@@ -36,7 +36,7 @@ export interface MatchNode {
     allowSelfReveal: boolean;
     minRevealsBeforePass: number;
     /** "Pedir carta" solo se puede usar una vez por turno. */
-    claimOncePerTurn: boolean;
+    askOncePerTurn: boolean;
     /** La carta que no coincide no se muestra: solo se avisa. */
     hideMismatch: boolean;
     /** Se pueden pedir varias cartas iguales de golpe. */

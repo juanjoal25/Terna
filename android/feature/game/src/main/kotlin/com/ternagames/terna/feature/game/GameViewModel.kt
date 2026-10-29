@@ -249,14 +249,17 @@ class GameViewModel @Inject constructor(
         act(GameAction.RevealCenter(slot))
     }
 
-    fun ask() = _state.update { it.copy(dialog = GameDialog.PickRevealTarget, selectingCenter = false) }
+    fun ask() {
+        val match = _state.value.match ?: return
+        if (GameLogic.askUsedUp(match)) {
+            _state.update { it.copy(message = "Solo puedes preguntar una vez por turno. Sigue pidiendo cartas, revela el centro o pasa el turno.") }
+            return
+        }
+        _state.update { it.copy(dialog = GameDialog.PickRevealTarget, selectingCenter = false) }
+    }
 
     fun claim() {
         val match = _state.value.match ?: return
-        if (GameLogic.claimUsedUp(match)) {
-            _state.update { it.copy(message = "Solo puedes pedir una carta por turno. Sigue preguntando o pasa el turno.") }
-            return
-        }
         val chase = GameLogic.chaseValue(match)
         _state.update { it.copy(dialog = if (chase != null) GameDialog.PickClaimTarget(chase) else GameDialog.PickNumber(), selectingCenter = false) }
     }

@@ -87,7 +87,7 @@ describe("simulación de partidas aleatorias", () => {
     [TERNA_SPICY, 4],
     [TRIO_ORIGINAL, 5],
     [withOptions(TERNA_CLASSIC, { allowPass: false }), 4], // sin pasar: solo la salida de emergencia evita bloqueos
-    [withOptions(TERNA_CLASSIC, { claimOncePerTurn: false, hideMismatch: false, allowMultiClaim: true }), 5],
+    [withOptions(TERNA_CLASSIC, { askOncePerTurn: false, hideMismatch: false, allowMultiClaim: true }), 5],
     [withOptions(TERNA_CLASSIC, { allowPass: true, claimFailEndsTurn: false, continueAfterSet: true }), 4],
     [CUARTA_DRAFT, 3],
     [CUARTA_DRAFT, 6],
